@@ -11,6 +11,19 @@ CE Custom Hook 保存 / 重建工具
 
 (function(){
 
+    const savedRegistrations = new Map();
+
+    function ownerOf(hook) {
+        const id = hook.saved ? hook.id : hook.runtimeId;
+        return `${hook.saved ? "saved" : "runtime"}:${id ?? hookKey(hook)}`;
+    }
+
+    function engineFor(type) {
+        if (type === "VarHook") return window.VarHook;
+        if (type === "RawHook") return window.RawHook;
+        if (type === "DeepProxyHook") return window.DeepProxyHook;
+    }
+
     if (typeof V.CE_allowCustomHookSave !== "boolean") {
         V.CE_allowCustomHookSave = false;
     }
@@ -121,6 +134,7 @@ CE Custom Hook 保存 / 重建工具
         else {
             list.push(savedHook);
         }
+        return savedHook;
     };
 
     setup.CE_removeCustomHook = function(id){
@@ -150,6 +164,7 @@ CE Custom Hook 保存 / 重建工具
         else {
             list.push(runtimeHook);
         }
+        return runtimeHook;
     };
 
     setup.CE_removeRuntimeCustomHook = function(runtimeId){
@@ -178,12 +193,16 @@ CE Custom Hook 保存 / 重建工具
             return;
         }
 
-        setup.CE_saveCustomHook({
+        const savedHook = setup.CE_saveCustomHook({
             ...hook,
             saved: true,            
         });
+        if (!savedHook) return;
 
+        setup.CE_unregisterCustomHookConfig(hook);
         setup.CE_removeRuntimeCustomHook(runtimeId);
+        setup.CE_registerCustomHookConfig(savedHook);
+        setup.CE_installAllCustomHooks();
 
         alert("已保存 Hook 到存檔：\n" + hook.path);
     };
@@ -191,20 +210,46 @@ CE Custom Hook 保存 / 重建工具
     setup.CE_unregisterCustomHookConfig = function(hook){
         if (!hook) return;
 
-        if (hook.type === "VarHook") VarHook.unregister?.(hook.path);
-        if (hook.type === "RawHook") RawHook.unregister?.(hook.path);
-        if (hook.type === "DeepProxyHook") DeepProxyHook.unregister?.(hook.path);
+        // The path-only UI command keeps its explicit whole-path behavior.
+        const owner = hook.id != null || hook.runtimeId != null ? ownerOf(hook) : undefined;
+        if (hook.type === "VarHook") VarHook.unregister?.(hook.path, owner);
+        if (hook.type === "RawHook") RawHook.unregister?.(hook.path, owner);
+        if (hook.type === "DeepProxyHook") DeepProxyHook.unregister?.(hook.path, owner);
+        if (owner) savedRegistrations.delete(owner);
+        setup.CE_installAllCustomHooks?.();
     };
 
-    setup.CE_registerCustomHookConfig = function(hook){
-        if (!hook || hook.enabled === false) return;
+    setup.CE_registerCustomHookConfig = function(hook, preserveOrder = false){
+        if (!hook || !engineFor(hook.type)) return;
+        if (hook.enabled === false) {
+            setup.CE_unregisterCustomHookConfig(hook);
+            return;
+        }
 
         const path = hook.path;
+        const owner = ownerOf(hook);
+        const ownership = {
+            owner,
+            preserveOrder,
+            scope: hook.saved ? State.variables : undefined,
+            isEnabled: () => hook.enabled !== false && (
+                !hook.saved || hook.mode !== "custom" ||
+                (V.debug === 1 && V.CE_allowCustomHookSave === true)
+            )
+        };
+        if (hook.saved) savedRegistrations.set(owner, hook);
+
+        const registerVar = (path, pos, neg, options = {}) =>
+            VarHook.register(path, pos, neg, { ...options, ...ownership });
+        const registerRaw = (path, options) =>
+            RawHook.register(path, { ...options, ...ownership });
+        const registerDeep = (path, options) =>
+            DeepProxyHook.register(path, { ...options, ...ownership });
 
         if (hook.type === "VarHook") {
 
             if (hook.mode === "monitor") {
-                VarHook.register(path, 1, 1, {
+                registerVar(path, 1, 1, {
                     after(oldValue, finalValue, diff, adjustedDiff, ctx){
                         console.log(
                             hook.saved ? "[cheat Extended][Saved VarHook Monitor]" : "[cheat Extended][Runtime VarHook Monitor]",
@@ -222,7 +267,7 @@ CE Custom Hook 保存 / 重建工具
             }
 
             if (hook.mode === "custom") {
-                VarHook.register(path, 1, 1, {
+                registerVar(path, 1, 1, {
                     transform(ctx){
                         return runCustomCode(hook, ctx, ctx.newValue);
                     },
@@ -241,7 +286,7 @@ CE Custom Hook 保存 / 重建工具
             }
 
             if (hook.mode === "multiplier") {
-                VarHook.register(
+                registerVar(
                     path,
                     Number(hook.posMult),
                     Number(hook.negMult)
@@ -249,7 +294,7 @@ CE Custom Hook 保存 / 重建工具
             }
 
             if (hook.mode === "lock") {
-                VarHook.register(path, 1, 1, {
+                registerVar(path, 1, 1, {
                     transform(ctx){
                         return ctx.old;
                     }
@@ -257,7 +302,7 @@ CE Custom Hook 保存 / 重建工具
             }
 
             if (hook.mode === "blockIncrease") {
-                VarHook.register(path, 1, 1, {
+                registerVar(path, 1, 1, {
                     transform(ctx){
                         if (ctx.diff > 0) return ctx.old;
                         return ctx.old + ctx.adjustedDiff;
@@ -266,7 +311,7 @@ CE Custom Hook 保存 / 重建工具
             }
 
             if (hook.mode === "blockDecrease") {
-                VarHook.register(path, 1, 1, {
+                registerVar(path, 1, 1, {
                     transform(ctx){
                         if (ctx.diff < 0) return ctx.old;
                         return ctx.old + ctx.adjustedDiff;
@@ -278,7 +323,7 @@ CE Custom Hook 保存 / 重建工具
         if (hook.type === "RawHook") {
 
             if (hook.mode === "monitor") {
-                RawHook.register(path, {
+                registerRaw(path, {
                     after(oldValue, finalValue, ctx){
                         console.log(
                             hook.saved ? "[cheat Extended][Saved RawHook Monitor]" : "[cheat Extended][Runtime RawHook Monitor]",
@@ -292,7 +337,7 @@ CE Custom Hook 保存 / 重建工具
             }
 
             if (hook.mode === "custom") {
-                RawHook.register(path, {
+                registerRaw(path, {
                     transform(ctx){
                         return runCustomCode(hook, ctx, ctx.newValue);
                     },
@@ -309,7 +354,7 @@ CE Custom Hook 保存 / 重建工具
             }
 
             if (hook.mode === "lock") {
-                RawHook.register(path, {
+                registerRaw(path, {
                     transform(ctx){
                         return ctx.old;
                     }
@@ -317,7 +362,7 @@ CE Custom Hook 保存 / 重建工具
             }
 
             if (hook.mode === "forceValue") {
-                RawHook.register(path, {
+                registerRaw(path, {
                     transform(){
                         return hook.value;
                     }
@@ -327,7 +372,7 @@ CE Custom Hook 保存 / 重建工具
 
         if (hook.type === "DeepProxyHook") {
 
-            DeepProxyHook.register(path, {
+            registerDeep(path, {
                 maxDepth: Number(hook.maxDepth) || 2,
                 ignoreKeys: ["length"],
 
@@ -412,14 +457,23 @@ CE Custom Hook 保存 / 重建工具
     setup.CE_rebuildSavedCustomHooks = function(){
         const list = ensureStore();
 
+        // Reconcile only saved owners; builtins and document-session rules survive.
+        // Rebuilding an existing owner must not change explicit registration order.
+        const wanted = new Map();
         for (const hook of list) {
-            if (
-                hook.mode === "custom" &&
-                !(V.debug === 1 && V.CE_allowCustomHookSave)
-            ) {
-                continue;
+            if (!hook || !engineFor(hook.type) || hook.enabled === false) continue;
+            if (hook.mode === "custom" && !(V.debug === 1 && V.CE_allowCustomHookSave === true)) continue;
+            wanted.set(ownerOf(hook), hook);
+        }
+        for (const [owner, hook] of savedRegistrations) {
+            const next = wanted.get(owner);
+            if (!next || next.type !== hook.type || next.path !== hook.path) {
+                engineFor(hook.type)?.unregister?.(hook.path, owner);
+                savedRegistrations.delete(owner);
             }
-            setup.CE_registerCustomHookConfig(hook);
+        }
+        for (const hook of wanted.values()) {
+            setup.CE_registerCustomHookConfig(hook, true);
         }
 
         setup.CE_installAllCustomHooks();
@@ -860,15 +914,13 @@ Macro.add("CE_CustomHookPanel", {
                     V.CE_DeepProxyHook_enable = true;
                 }
 
-                setup.CE_registerCustomHookConfig(snapshot);
+                // Register the stored identity, including an existing rule's ID.
+                const stored = state.saveToStore
+                    ? setup.CE_saveCustomHook(snapshot)
+                    : setup.CE_addRuntimeCustomHook(snapshot);
+                if (!stored) return;
+                setup.CE_registerCustomHookConfig(stored);
                 setup.CE_installAllCustomHooks();
-
-                if (state.saveToStore) {
-                    setup.CE_saveCustomHook(snapshot);
-                }
-                else {
-                    setup.CE_addRuntimeCustomHook(snapshot);
-                }
 
                 alert(
                     "Hook 已註冊：" + path +
@@ -897,7 +949,7 @@ Macro.add("CE_CustomHookPanel", {
                     path
                 });
 
-                alert("Hook 已卸載：" + path + "\n切換 Passage 後會完全生效。");
+                alert("Hook 已卸載：" + path + "\n設定未刪除；已保存規則會在切換 Passage 後重新註冊。");
                 refresh();
             }
             catch (e) {

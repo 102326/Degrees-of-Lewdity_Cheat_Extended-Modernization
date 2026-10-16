@@ -8,7 +8,7 @@ window.CEiconClicked = CEiconClicked;
 // 偵測 Simple Frameworks。
 // 僅記錄相容旗標；實際圖示插入方式由對應框架端處理。
 function CEiconSFdetect(){    
-    const simpleMod = window.modUtils.getAnyModByNameNoAlias('Simple Frameworks'); // ⚡ Simple Frameworks
+    const simpleMod = (window.modUtils.getModListNameNoAlias().includes('Simple Frameworks') ? window.modUtils.getAnyModByNameNoAlias('Simple Frameworks') : undefined); // ⚡ Simple Frameworks
     const logger = window.modUtils.getLogger();
     //logger.warn(`[cheat Extended][CEiconSFdetect] 🧾 simpleMod = ${simpleMod}`);
     //console.warn(`[cheat Extended][CEiconSFdetect] 🧾 simpleMod = ${simpleMod}`);

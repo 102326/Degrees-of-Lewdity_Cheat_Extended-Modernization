@@ -173,10 +173,17 @@ maxDepth 越高，
     ===================================================== */
 
     // 註冊表
-    const registry = {};
+    const registrations = window.CE_createHookRegistry();
+    const registry = registrations.current;
 
     // 已安裝 hook 的變數
     const installed = {};
+    const proxyTargets = new WeakMap();
+
+    function unwrap(value) {
+        while (proxyTargets.has(value)) value = proxyTargets.get(value);
+        return value;
+    }
 
     // 是否啟用 DeepProxyHook
     if (typeof V.CE_DeepProxyHook_enable !== "boolean") {
@@ -321,7 +328,7 @@ maxDepth 越高，
 
     function register(varPath, options = {}){
 
-        registry[varPath] = {
+        registrations.register(varPath, {
             deep: options.deep ?? true,
             maxDepth: options.maxDepth ?? 2,
 
@@ -331,15 +338,17 @@ maxDepth 越高，
             before: options.before,
             transform: options.transform,
             after: options.after,
-            delete: options.delete
-        };
+            delete: options.delete,
+            scope: options.scope,
+            isEnabled: options.isEnabled
+        }, options.owner, options.preserveOrder);
 
         log("register:", varPath, registry[varPath]);
     }
     
-    function unregister(varPath){
-        delete registry[varPath];
-        installed[varPath] = false;
+    function unregister(varPath, owner){
+        registrations.unregister(varPath, owner);
+        if (!registry[varPath]) delete installed[varPath];
         log("unregister:", varPath);
     }
 
@@ -368,12 +377,12 @@ maxDepth 越高，
 
         try{
 
-            if (installed[path]){
-                log("skip installed:", path);
-                return;
-            }
-
+            if (installed[path] && installed[path].state !== State.variables) delete installed[path];
             const resolved = getParentAndKey(path);
+            const stale = installed[path];
+            if (stale && (stale.state !== State.variables || !resolved ||
+                stale.obj !== resolved.obj || !(resolved.key in resolved.obj) ||
+                stale.proxy !== resolved.obj[resolved.key])) delete installed[path];
 
             if (!resolved){
                 warn("path not found:", path);
@@ -387,14 +396,29 @@ maxDepth 越高，
                 return;
             }
 
-            const target = obj[key];
+            const config = registry[path];
+            if (!config || (config.scope && config.scope !== State.variables)) return;
+
+            const previous = installed[path];
+            if (previous?.obj === obj && previous.key === key &&
+                previous.proxy === obj[key] && previous.config === config &&
+                previous.state === State.variables) return;
+
+            const target = unwrap(obj[key]);
 
             if (target == null || typeof target !== "object"){
                 warn("target is not object/array:", path, target);
                 return;
             }
 
-            const config = registry[path];
+            const binding = { obj, key, config, state: State.variables, proxy: null };
+            function isActive() {
+                if (installed[path] !== binding || registry[path] !== config ||
+                    State.variables !== binding.state ||
+                    (config.isEnabled && !config.isEnabled())) return false;
+                const current = getParentAndKey(path);
+                return current?.obj === obj && obj[key] === binding.proxy;
+            }
 
             /* =====================================================
             Proxy 快取
@@ -480,6 +504,8 @@ maxDepth 越高，
 
             function proxify(targetObj, currentPath, depth){
 
+                targetObj = unwrap(targetObj);
+
                 if (targetObj == null || typeof targetObj !== "object"){
                     return targetObj;
                 }
@@ -511,7 +537,7 @@ maxDepth 越高，
 
                         const value = Reflect.get(obj, prop, receiver);
 
-                        if (!config.deep){
+                        if (!isActive() || !config.deep){
                             return value;
                         }
 
@@ -559,6 +585,8 @@ maxDepth 越高，
                     ========================== */
 
                     set(obj, prop, value, receiver){
+
+                        if (!isActive()) return Reflect.set(obj, prop, value, receiver);
 
                         const propName = String(prop);
                         const fullPath = `${currentPath}.${propName}`;
@@ -642,6 +670,8 @@ maxDepth 越高，
 
                     deleteProperty(obj, prop){
 
+                        if (!isActive()) return Reflect.deleteProperty(obj, prop);
+
                         const propName = String(prop);
                         const fullPath = `${currentPath}.${propName}`;
                         const oldValue = obj[prop];
@@ -688,6 +718,7 @@ maxDepth 越高，
                 });
 
                 proxyCache.set(targetObj, proxy);
+                proxyTargets.set(proxy, targetObj);
 
                 return proxy;
             }
@@ -713,12 +744,14 @@ maxDepth 越高，
             會進入 Proxy.set。
             ===================================================== */
 
-            obj[key] = proxify(target, path, 0);
-            installed[path] = true;
+            binding.proxy = proxify(target, path, 0);
+            obj[key] = binding.proxy;
+            installed[path] = binding;
 
             log("install deep proxy hook:", path);
         }
         catch(e){
+            delete installed[path];
             error("installDeepProxyHook error:", path, e);
         }
     }
@@ -755,10 +788,6 @@ maxDepth 越高，
     ===================================================== */
 
     $(document).on(":passagestart", () => {
-        for (const v in installed){
-            installed[v] = false;
-        }
-
         installAll();
     });
 
@@ -892,7 +921,8 @@ Cheat Extended - RawHook 原始變數攔截框架
     ===================================================== */
 
     // 註冊表
-    const registry = {};
+    const registrations = window.CE_createHookRegistry();
+    const registry = registrations.current;
 
     // 已安裝 hook 的變數
     const installed = {};
@@ -991,18 +1021,20 @@ Cheat Extended - RawHook 原始變數攔截框架
 
     function register(varPath, options = {}){
 
-        registry[varPath] = {
+        registrations.register(varPath, {
             before: options.before,
             transform: options.transform,
-            after: options.after
-        };
+            after: options.after,
+            scope: options.scope,
+            isEnabled: options.isEnabled
+        }, options.owner, options.preserveOrder);
 
         log("register:", varPath, options);
     }
     
-    function unregister(varPath){
-        delete registry[varPath];
-        installed[varPath] = false;
+    function unregister(varPath, owner){
+        registrations.unregister(varPath, owner);
+        if (!registry[varPath]) delete installed[varPath];
         log("unregister:", varPath);
     }
 
@@ -1044,12 +1076,12 @@ Cheat Extended - RawHook 原始變數攔截框架
 
         try{
 
-            if (installed[path]){
-                log("skip installed:", path);
-                return;
-            }
-
+            if (installed[path] && installed[path].state !== State.variables) delete installed[path];
             const resolved = getParentAndKey(path);
+            const stale = installed[path];
+            if (stale && (stale.state !== State.variables || !resolved ||
+                stale.obj !== resolved.obj || !(resolved.key in resolved.obj) ||
+                Object.getOwnPropertyDescriptor(resolved.obj, resolved.key)?.set !== stale.setter)) delete installed[path];
 
             if (!resolved){
                 warn("path not found:", path);
@@ -1063,11 +1095,18 @@ Cheat Extended - RawHook 原始變數攔截框架
                 return;
             }
 
+            const config = registry[path];
+            if (!config || (config.scope && config.scope !== State.variables)) return;
+            const previous = installed[path];
+            if (previous?.obj === obj && previous.state === State.variables &&
+                Object.getOwnPropertyDescriptor(obj, key)?.set === previous.setter) return;
+
+            const boundState = State.variables;
             let _value = obj[key];
 
             log("install hook:", path);
 
-            Object.defineProperty(obj, key, {
+            const descriptor = {
 
                 configurable: true,
 
@@ -1082,6 +1121,11 @@ Cheat Extended - RawHook 原始變數攔截框架
                         // 先保留外部寫入值。
                         // 若 RawHook 未啟用或跳過，變數仍會正常變成 newValue。
                         _value = newValue;
+
+                        // Old aliases must not execute rules from the current save.
+                        const current = getParentAndKey(path);
+                        if (State.variables !== boundState || current?.obj !== obj ||
+                            Object.getOwnPropertyDescriptor(obj, key)?.set !== descriptor.set) return;
 
                         // RawHook 未啟用
                         if (!V?.CE_VarHook_enable || !V?.CE_RawHook_enable){
@@ -1112,6 +1156,8 @@ Cheat Extended - RawHook 原始變數攔截框架
                         }
 
                         const config = registry[path];
+                        if ((config.scope && config.scope !== State.variables) ||
+                            (config.isEnabled && !config.isEnabled())) return;
 
                         const ctx = {
                             path,
@@ -1198,11 +1244,12 @@ Cheat Extended - RawHook 原始變數攔截框架
                         lock = false;
                     }
                 }
-            });
-
-            installed[path] = true;
+            };
+            Object.defineProperty(obj, key, descriptor);
+            installed[path] = { obj, state: boundState, setter: descriptor.set };
         }
         catch(e){
+            delete installed[path];
             error("installRawHook error:", path, e);
         }
     }
@@ -1238,10 +1285,6 @@ Cheat Extended - RawHook 原始變數攔截框架
 
     $(document).on(":passagestart", () => {
         log("passage start reinstall");
-
-        for (const v in installed){
-            installed[v] = false;
-        }
 
         installAll();
     });
@@ -1413,7 +1456,8 @@ VarHook.on(...)
     ===================================================== */
 
     // 註冊表
-    const registry = {};
+    const registrations = window.CE_createHookRegistry();
+    const registry = registrations.current;
 
     // 已安裝 hook 的變數
     const installed = {};
@@ -1637,21 +1681,23 @@ VarHook.on(...)
 
     function register(varPath, posMult, negMult, options = {}){
 
-        registry[varPath] = {
+        registrations.register(varPath, {
             pos: posMult,
             neg: negMult,
 
             before: options.before,
             transform: options.transform,
-            after: options.after
-        };
+            after: options.after,
+            scope: options.scope,
+            isEnabled: options.isEnabled
+        }, options.owner, options.preserveOrder);
 
         log("register:", varPath, posMult, negMult, options);
     }
     
-    function unregister(varPath){
-        delete registry[varPath];
-        installed[varPath] = false;
+    function unregister(varPath, owner){
+        registrations.unregister(varPath, owner);
+        if (!registry[varPath]) delete installed[varPath];
         log("unregister:", varPath);
     }
 
@@ -1698,12 +1744,12 @@ VarHook.on(...)
 
         try{
 
-            if (installed[path]){
-                log("skip installed:", path);
-                return;
-            }
-
+            if (installed[path] && installed[path].state !== State.variables) delete installed[path];
             const resolved = getParentAndKey(path);
+            const stale = installed[path];
+            if (stale && (stale.state !== State.variables || !resolved ||
+                stale.obj !== resolved.obj || !(resolved.key in resolved.obj) ||
+                Object.getOwnPropertyDescriptor(resolved.obj, resolved.key)?.set !== stale.setter)) delete installed[path];
 
             if (!resolved){
                 warn("path not found:", path);
@@ -1717,11 +1763,18 @@ VarHook.on(...)
                 return;
             }
 
+            const config = registry[path];
+            if (!config || (config.scope && config.scope !== State.variables)) return;
+            const previous = installed[path];
+            if (previous?.obj === obj && previous.state === State.variables &&
+                Object.getOwnPropertyDescriptor(obj, key)?.set === previous.setter) return;
+
+            const boundState = State.variables;
             let _value = obj[key];
 
             log("install hook:", path);
 
-            Object.defineProperty(obj, key, {
+            const descriptor = {
 
                 configurable: true,
 
@@ -1736,6 +1789,11 @@ VarHook.on(...)
                         // 先保留外部寫入值。
                         // 若 VarHook 未啟用或跳過，變數仍會正常變成 newValue。
                         _value = newValue;
+
+                        // Old aliases must not execute rules from the current save.
+                        const current = getParentAndKey(path);
+                        if (State.variables !== boundState || current?.obj !== obj ||
+                            Object.getOwnPropertyDescriptor(obj, key)?.set !== descriptor.set) return;
 
                         const macroLock = setup.CE_macroLock;
 
@@ -1768,6 +1826,8 @@ VarHook.on(...)
                         }
 
                         const config = registry[path];
+                        if ((config.scope && config.scope !== State.variables) ||
+                            (config.isEnabled && !config.isEnabled())) return;
 
                         const oldNum = Number(old);
                         const newNum = Number(newValue);
@@ -1901,11 +1961,12 @@ VarHook.on(...)
                         lock = false;
                     }
                 }
-            });
-
-            installed[path] = true;
+            };
+            Object.defineProperty(obj, key, descriptor);
+            installed[path] = { obj, state: boundState, setter: descriptor.set };
         }
         catch(e){
+            delete installed[path];
             error("installVarHook error:", path, e);
         }
     }
@@ -1941,10 +2002,6 @@ VarHook.on(...)
 
     $(document).on(":passagestart", () => {
         log("passage start reinstall");
-
-        for (const v in installed){
-            installed[v] = false;
-        }
 
         installAll();
     });

@@ -63,8 +63,8 @@ function addBodyWritingForMaplebirch(tattoos) {
 // ----------------------------
 function registerCETattoos() {
     const logger = window.modUtils.getLogger();
-    const maplebirchMod = window.modUtils.getAnyModByNameNoAlias('maplebirch');
-    const simpleMod = window.modUtils.getAnyModByNameNoAlias('Simple Frameworks');
+    const maplebirchMod = (window.modUtils.getModListNameNoAlias().includes('maplebirch') ? window.modUtils.getAnyModByNameNoAlias('maplebirch') : undefined);
+    const simpleMod = (window.modUtils.getModListNameNoAlias().includes('Simple Frameworks') ? window.modUtils.getAnyModByNameNoAlias('Simple Frameworks') : undefined);
 
     const tattoos = createCETattoos();
 

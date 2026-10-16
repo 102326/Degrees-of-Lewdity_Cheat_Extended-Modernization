@@ -8,7 +8,7 @@ const TimeTravelAdapter = (() => {
 
     // 判斷遊戲是否有 Simple Framework
     const hasSimpleFramework =
-        !!window.modUtils?.getAnyModByNameNoAlias?.('Simple Frameworks');
+        !!(window.modUtils?.getModListNameNoAlias?.().includes('Simple Frameworks') ? window.modUtils?.getAnyModByNameNoAlias?.('Simple Frameworks') : undefined);
 
     console.info(
         `${LOG_PREFIX} Adapter 初始化，框架模式：`,

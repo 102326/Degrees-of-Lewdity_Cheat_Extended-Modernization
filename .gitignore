@@ -1,0 +1,8 @@
+node_modules/
+dist/
+*.log
+.DS_Store
+.agents/skills/dol-dev-tools-paisley-park/
+# Local task briefs and supplied raw audit attachments are not public payloads.
+docs/R1-REQUEST.md
+docs/r0/

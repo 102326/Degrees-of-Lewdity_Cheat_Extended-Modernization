@@ -92,12 +92,13 @@
 
             
             //return originalHandler.call(this);
+            const previousLock = setup.CE_macroLock;
             setup.CE_macroLock = true;
             try {
                 return originalHandler.call(this);
             }
             finally {
-                setup.CE_macroLock = false;
+                setup.CE_macroLock = previousLock;
             }
         };
 

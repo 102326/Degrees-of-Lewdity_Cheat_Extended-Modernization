@@ -1,6 +1,21 @@
 
 
-# Degrees-of-Lewdity Cheat Extended
+# Cheat Extended — 全面重构（Modernization）
+
+**Cheat Extended 是原作者的作品。本仓库基于原作进行功能修复与现代化重构，保留原作界面身份与既有贡献者署名。**
+
+- **原 Mod 作者：[chris81605](https://github.com/chris81605)**
+- **对应原项目：[chris81605/Degrees-of-Lewdity_Cheat_Extended](https://github.com/chris81605/Degrees-of-Lewdity_Cheat_Extended)**
+- 固定源码基线：[c36b23a6ab1899c7f780faa63945fe6e199a6355](https://github.com/chris81605/Degrees-of-Lewdity_Cheat_Extended/tree/c36b23a6ab1899c7f780faa63945fe6e199a6355)，原版本 `1.20.3.1`。
+- 重构维护：[102326](https://github.com/102326)。原作及第三方素材的权利与署名继续保留，不因重构而转移。
+- 原项目许可证：[CC BY-NC-SA 4.0](LICENSE.txt)；Spectrum、OpenCC 等第三方通知按各自来源保留，详见 [修改与署名说明](R1-NOTICE.md)。
+
+当前为 **CE-R1 研究阶段**：功能重制第一、未来维护第二、UI 美化最后。
+已完成内容、构建入口和验证范围见 [R1 工程记录](docs/R1.md)。
+这是独立维护的衍生重构项目，不代表原作者正式发行或对本次修改的背书。
+当前 `28/28` 定向检查通过；真实游戏加载、Patch 命中与 Windows/Android 验收尚未完成。
+
+以下保留原项目的功能说明、贡献名单与游戏来源：
 
 <img decoding="async" src="https://gitgud.io/uploads/-/system/user/avatar/9096/avatar.png" width="24" alt=""> **遊戲作者**: Vrelnir
 
