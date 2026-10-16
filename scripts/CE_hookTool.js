@@ -178,12 +178,6 @@ maxDepth 越高，
 
     // 已安裝 hook 的變數
     const installed = {};
-    const proxyTargets = new WeakMap();
-
-    function unwrap(value) {
-        while (proxyTargets.has(value)) value = proxyTargets.get(value);
-        return value;
-    }
 
     // 是否啟用 DeepProxyHook
     if (typeof V.CE_DeepProxyHook_enable !== "boolean") {
@@ -236,12 +230,12 @@ maxDepth 越高，
         let obj = State.variables;
 
         for (let i = 0; i < parts.length - 1; i++){
-            obj = obj?.[parts[i]];
+            obj = window.CE_hookIdentity.raw(obj)?.[parts[i]];
             if (!obj) return null;
         }
 
         return {
-            obj,
+            obj: window.CE_hookIdentity.raw(obj),
             key: parts[parts.length - 1]
         };
     }
@@ -382,7 +376,7 @@ maxDepth 越高，
             const stale = installed[path];
             if (stale && (stale.state !== State.variables || !resolved ||
                 stale.obj !== resolved.obj || !(resolved.key in resolved.obj) ||
-                stale.proxy !== resolved.obj[resolved.key])) delete installed[path];
+                !window.CE_hookIdentity.contains(resolved.obj[resolved.key], stale.proxy))) delete installed[path];
 
             if (!resolved){
                 warn("path not found:", path);
@@ -401,10 +395,12 @@ maxDepth 越高，
 
             const previous = installed[path];
             if (previous?.obj === obj && previous.key === key &&
-                previous.proxy === obj[key] && previous.config === config &&
+                window.CE_hookIdentity.contains(obj[key], previous.proxy) && previous.config === config &&
                 previous.state === State.variables) return;
 
-            const target = unwrap(obj[key]);
+            // The root replaces its previous CE wrapper. Descendant wrappers
+            // belong to other registrations and must remain in the get chain.
+            const target = window.CE_hookIdentity.raw(obj[key]);
 
             if (target == null || typeof target !== "object"){
                 warn("target is not object/array:", path, target);
@@ -417,7 +413,7 @@ maxDepth 越高，
                     State.variables !== binding.state ||
                     (config.isEnabled && !config.isEnabled())) return false;
                 const current = getParentAndKey(path);
-                return current?.obj === obj && obj[key] === binding.proxy;
+                return current?.obj === obj && window.CE_hookIdentity.contains(obj[key], binding.proxy);
             }
 
             /* =====================================================
@@ -503,8 +499,6 @@ maxDepth 越高，
             ===================================================== */
 
             function proxify(targetObj, currentPath, depth){
-
-                targetObj = unwrap(targetObj);
 
                 if (targetObj == null || typeof targetObj !== "object"){
                     return targetObj;
@@ -718,7 +712,10 @@ maxDepth 越高，
                 });
 
                 proxyCache.set(targetObj, proxy);
-                proxyTargets.set(proxy, targetObj);
+                // A caller may assign this wrapper back into the object tree.
+                // Reuse our own wrapper without stripping other registrations.
+                proxyCache.set(proxy, proxy);
+                window.CE_hookIdentity.remember(proxy, targetObj);
 
                 return proxy;
             }
@@ -976,12 +973,12 @@ Cheat Extended - RawHook 原始變數攔截框架
         let obj = State.variables;
 
         for (let i = 0; i < parts.length - 1; i++){
-            obj = obj?.[parts[i]];
+            obj = window.CE_hookIdentity.raw(obj)?.[parts[i]];
             if (!obj) return null;
         }
 
         return {
-            obj,
+            obj: window.CE_hookIdentity.raw(obj),
             key: parts[parts.length - 1]
         };
     }
@@ -1515,12 +1512,12 @@ VarHook.on(...)
         let obj = State.variables;
 
         for (let i=0; i<parts.length-1; i++){
-            obj = obj?.[parts[i]];
+            obj = window.CE_hookIdentity.raw(obj)?.[parts[i]];
             if (!obj) return null;
         }
 
         return {
-            obj,
+            obj: window.CE_hookIdentity.raw(obj),
             key: parts[parts.length-1]
         };
     }
