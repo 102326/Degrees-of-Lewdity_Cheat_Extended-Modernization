@@ -18,6 +18,19 @@ CE Custom Hook 保存 / 重建工具
         return `${hook.saved ? "saved" : "runtime"}:${id ?? hookKey(hook)}`;
     }
 
+    // A copied ID with a different definition is not the same restored rule.
+    // Enabled/saved flags and State identity do not change the definition.
+    function definitionOf(hook) {
+        return JSON.stringify({
+            type: hook.type, path: hook.path,
+            targetPath: String(hook.targetPath || "").trim(),
+            mode: hook.mode, value: hook.value,
+            customCode: String(hook.customCode || ""),
+            posMult: Number(hook.posMult), negMult: Number(hook.negMult),
+            maxDepth: Number(hook.maxDepth) || 2
+        });
+    }
+
     function engineFor(type) {
         if (type === "VarHook") return window.VarHook;
         if (type === "RawHook") return window.RawHook;
@@ -231,6 +244,7 @@ CE Custom Hook 保存 / 重建工具
         const ownership = {
             owner,
             preserveOrder,
+            orderKey: definitionOf(hook),
             scope: hook.saved ? State.variables : undefined,
             isEnabled: () => hook.enabled !== false && (
                 !hook.saved || hook.mode !== "custom" ||

@@ -333,6 +333,7 @@ maxDepth 越高，
             transform: options.transform,
             after: options.after,
             delete: options.delete,
+            orderKey: options.orderKey,
             scope: options.scope,
             isEnabled: options.isEnabled
         }, options.owner, options.preserveOrder);
@@ -1022,6 +1023,7 @@ Cheat Extended - RawHook 原始變數攔截框架
             before: options.before,
             transform: options.transform,
             after: options.after,
+            orderKey: options.orderKey,
             scope: options.scope,
             isEnabled: options.isEnabled
         }, options.owner, options.preserveOrder);
@@ -1685,6 +1687,7 @@ VarHook.on(...)
             before: options.before,
             transform: options.transform,
             after: options.after,
+            orderKey: options.orderKey,
             scope: options.scope,
             isEnabled: options.isEnabled
         }, options.owner, options.preserveOrder);

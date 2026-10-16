@@ -1,6 +1,7 @@
 /* Cheat Extended R1: per-engine ownership, not a second Hook executor.
  * Legacy register(path, ...) remains the base rule. Custom owners shadow it;
- * last registered custom owner wins. Removing one owner reveals its predecessor.
+ * last explicitly registered custom owner wins. Automatic restore keeps its rank.
+ * Removing one owner reveals its predecessor.
  * unregister(path) retains the explicit legacy meaning: remove that entire path.
  */
 // Internal identity shared by the three engines. Only CE-created proxies are
@@ -23,12 +24,21 @@ window.CE_hookIdentity = (() => {
 window.CE_createHookRegistry = function () {
     const current = Object.create(null);
     const paths = new Map();
+    // Document-local scalar metadata only: no State, targets or rule closures.
+    const orderHistory = new Map();
+    let sequence = 0;
 
     function select(path) {
         const owners = paths.get(path);
-        let selected = owners?.get("legacy");
-        for (const [owner, config] of owners ?? []) {
-            if (owner !== "legacy") selected = config;
+        let selected = owners?.get("legacy")?.config;
+        let winner;
+        for (const [owner, { config, rank }] of owners ?? []) {
+            if (owner !== "legacy" && (!winner ||
+                rank.explicit > winner.explicit ||
+                (rank.explicit === winner.explicit && rank.sequence > winner.sequence))) {
+                selected = config;
+                winner = rank;
+            }
         }
         if (selected) current[path] = selected;
         else {
@@ -41,8 +51,13 @@ window.CE_createHookRegistry = function () {
         current,
         register(path, config, owner = "legacy", preserveOrder = false) {
             const owners = paths.get(path) ?? new Map();
-            if (!preserveOrder) owners.delete(owner);
-            owners.set(owner, config);
+            const identity = JSON.stringify([path, owner, config.orderKey ?? ""]);
+            let rank = preserveOrder ? orderHistory.get(identity) : undefined;
+            if (!rank) {
+                rank = { explicit: !preserveOrder, sequence: ++sequence };
+                orderHistory.set(identity, rank);
+            }
+            owners.set(owner, { config, rank });
             paths.set(path, owners);
             select(path);
         },
