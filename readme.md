@@ -2,9 +2,9 @@
 
 Cheat Extended（作弊拓展）的独立重制项目，基于 [chris81605 的原作](https://github.com/chris81605/Degrees-of-Lewdity_Cheat_Extended)。保留原有菜单和操作入口，重点修复功能行为，整理 Hook、事件与临时资源的生命周期，逐步替换已停止维护的 Simple Framework 接入。
 
-当前正式版本为 **1.20.3.1-rebuild.28**，沿用已验证的冻结运行包。支持范围以本页列出的实测组合和升级路径为准；首次升级请保留旧包与原存档备份。
+当前正式版本为 **1.20.3.1-rebuild.29**，本次专项恢复外部直接改写余额的原生收支处理；rebuild.28 的 ZIP 和标签保持冻结。支持范围以本页列出的实测组合和升级路径为准；首次升级请保留旧包与原存档备份。
 
-[下载正式版](https://github.com/102326/Degrees-of-Lewdity_Cheat_Extended-Modernization/releases/tag/v1.20.3.1-rebuild.28) · [安装与已知边界](https://github.com/102326/Degrees-of-Lewdity_Cheat_Extended-Modernization/releases/download/v1.20.3.1-rebuild.28/RELEASE-NOTES.md) · [本版源码](https://github.com/102326/Degrees-of-Lewdity_Cheat_Extended-Modernization/tree/v1.20.3.1-rebuild.28) · [问题反馈](https://github.com/102326/Degrees-of-Lewdity_Cheat_Extended-Modernization/issues)
+[下载正式版](https://github.com/102326/Degrees-of-Lewdity_Cheat_Extended-Modernization/releases/tag/v1.20.3.1-rebuild.29) · [安装与已知边界](https://github.com/102326/Degrees-of-Lewdity_Cheat_Extended-Modernization/releases/download/v1.20.3.1-rebuild.29/RELEASE-NOTES.md) · [本版源码](https://github.com/102326/Degrees-of-Lewdity_Cheat_Extended-Modernization/tree/v1.20.3.1-rebuild.29) · [问题反馈](https://github.com/102326/Degrees-of-Lewdity_Cheat_Extended-Modernization/issues)
 
 ## 项目提供什么
 
@@ -18,11 +18,17 @@ CE 提供角色属性与战斗调整、金钱和时间控制、随身衣柜与�
 | 战斗与界面 | 整理每战一次状态、敌方状态面板，以及侧栏、菜单、语言转换、外观和地图的回调与节点清理。 |
 | 框架接入 | 退出旧 Simple Framework 路径，使用 MapleBirch 和游戏原有接口；保留原作菜单与面板。 |
 
+## Money Watch 的恢复范围
+
+开启原金钱面板中的 Money Watch 后，先建立余额基线，再按游戏秒将未经过原生交易入口的净变化送入 `money`，由游戏维护 `moneyStats`。倍率开启时沿用收入／支出倍率，正常原生交易不重复补算。它不能区分工资、退款和手动纠正，也不能还原采样间每笔收入与支出；纠正余额前请关闭监控。开关仍在原调试面板。
+
+读档、State 更换、停用和重新启用会重建基线，不追补停用期间变化。部分失败会暂停路由，控制台及金钱面板显示故障提示；余额可能已重建，统计也可能已有变化，不承诺回滚。检查并处理后关闭再开启。具体合同与验证范围见[金钱专项说明](docs/release/REBUILD29_MONEY_RECOVERY.md)。
+
 ## 安装与依赖
 
 1. 备份原 CE 包和升级前存档，并保留可以恢复的旧环境。
-2. 从发布页下载 `Cheat-Extended-1.20.3.1-rebuild.28.mod.zip`，通过 ModLoader 或所用管理器的正常导入入口安装。同一环境保留一份 CE。
-3. 按依赖提示安装后重启游戏，确认 CE 版本为 `1.20.3.1-rebuild.28`。首次试用请另存，不要覆盖唯一的旧档。
+2. 从发布页下载 `Cheat-Extended-1.20.3.1-rebuild.29.mod.zip`，通过 ModLoader 或所用管理器的正常导入入口安装。同一环境保留一份 CE。
+3. 按依赖提示安装后重启游戏，确认 CE 版本为 `1.20.3.1-rebuild.29`。首次试用请另存，不要覆盖唯一的旧档。
 
 本版包内声明如下。版本范围是加载约束，不表示其中每一版本都已通过兼容测试。
 
@@ -40,7 +46,7 @@ CE 提供角色属性与战斗调整、金钱和时间控制、随身衣柜与�
 
 ## 已验证范围
 
-本版在以下组合完成了开发方的 Windows 与 Android 验证：
+rebuild.28 的 Windows、Android 与旧包升级证据按原范围保留；其它模块未因此重新验收。以下为该轮历史组合：
 
 | 项目 | 版本或宿主 |
 | --- | --- |
@@ -50,21 +56,23 @@ CE 提供角色属性与战斗调整、金钱和时间控制、随身衣柜与�
 | Windows | Chrome `155.0.8059.84`，使用测试 APK 的游戏资产，仅移除两条 Cordova 桥标签 |
 | Android | Android `17` / WebView `154.0.8037.58` |
 
+rebuild.29 金钱专项使用同一游戏、Lyra、Loader、Maple 与 Android/WebView 版本，当前 UI 为 `3.0.0`，运行列表为 40 个 Mod（包含 StoneFreeHost）。外部改写由明确标注的测试脚本模拟；不宣称真实第三方发薪剧情已验证。本轮未重新运行 Windows 或完整组合矩阵，详细结果见金钱专项说明。
+
 Windows 结果覆盖 Chrome 浏览器宿主，未验收 Windows 封装 App 或 Cordova 桥。Windows 已完成固定上游源码生成样本的升级检查；Android 已完成原作者实际发行 ZIP（包内版本 `1.20.3.1`）生成样本的读入、另存、真实 App 重启、再读及重置。**真实玩家长期旧档、其它历史 CE 版本、Simple-only 环境迁移及新版档向旧版降级未验证**。其它设备和 Mod 组合也不在当前验证范围内。
 
-发布页概述本版变化；[正式版使用说明](https://github.com/102326/Degrees-of-Lewdity_Cheat_Extended-Modernization/releases/download/v1.20.3.1-rebuild.28/RELEASE-NOTES.md)列出服装还原、旧手动面板、窗口归属、渲染同步及其它已知边界。开发方运行验证与独立文件复核的结论各有范围，不代表独立方重跑了全部测试。
+发布页概述本版变化；[正式版使用说明](https://github.com/102326/Degrees-of-Lewdity_Cheat_Extended-Modernization/releases/download/v1.20.3.1-rebuild.29/RELEASE-NOTES.md)列出服装还原、旧手动面板、窗口归属、渲染同步及其它已知边界。开发方运行验证与独立文件复核的结论各有范围，不代表独立方重跑了全部测试。
 
 ## 源码与反馈
 
-默认克隆的 `main` 已包含当前正式版运行源码，保留原有历史与新版首页。精确复现已发布包请使用固定标签 [`v1.20.3.1-rebuild.28`](https://github.com/102326/Degrees-of-Lewdity_Cheat_Extended-Modernization/tree/v1.20.3.1-rebuild.28)。`main` 的 README 会继续维护，且它本身属于打包资源，因此本地重打包的 ZIP 摘要可能与冻结发布包不同。构建方法及源码对应关系见[源码与构建说明](docs/release/REBUILD28_SOURCE_IDENTITY.md)。
+默认克隆的 `main` 用于维护当前运行源码，保留原有历史。精确复现已发布包请使用固定标签 [`v1.20.3.1-rebuild.29`](https://github.com/102326/Degrees-of-Lewdity_Cheat_Extended-Modernization/tree/v1.20.3.1-rebuild.29)。`main` 的 README 会继续维护，且它本身属于打包资源，因此本地重打包的 ZIP 摘要可能与冻结发布包不同。构建方法及源码对应关系见[金钱专项与构建说明](docs/release/REBUILD29_MONEY_RECOVERY.md)。rebuild.28 的历史身份仍见[原源码说明](docs/release/REBUILD28_SOURCE_IDENTITY.md)。
 
-报告问题时，请提供 CE、游戏与框架版本、触发步骤、预期结果和实际结果，可选附脱敏截图或日志。可使用[反馈模板](https://github.com/102326/Degrees-of-Lewdity_Cheat_Extended-Modernization/releases/download/v1.20.3.1-rebuild.28/FEEDBACK-TEMPLATE.md)，无需默认提供完整存档。
+报告问题时，请提供 CE、游戏与框架版本、触发步骤、预期结果和实际结果，可选附脱敏截图或日志。可使用[反馈模板](https://github.com/102326/Degrees-of-Lewdity_Cheat_Extended-Modernization/releases/download/v1.20.3.1-rebuild.29/FEEDBACK-TEMPLATE.md)，无需默认提供完整存档。
 
 ## 来源与许可
 
 - 原 Mod 作者：[chris81605](https://github.com/chris81605)。重制基于原版 `1.20.3.1` 的固定提交 [`c36b23a`](https://github.com/chris81605/Degrees-of-Lewdity_Cheat_Extended/tree/c36b23a6ab1899c7f780faa63945fe6e199a6355)。
 - 重制维护：[102326](https://github.com/102326)。本项目为独立衍生维护，不代表原作者正式发行或背书；保留隨風飄逸及其它贡献者署名。
-- 沿用 [CC BY-NC-SA 4.0](LICENSE.txt)，Spectrum、OpenCC 等第三方代码保留各自许可与通知，见[修改与署名说明](https://github.com/102326/Degrees-of-Lewdity_Cheat_Extended-Modernization/blob/v1.20.3.1-rebuild.28/R1-NOTICE.md)。
+- 沿用 [CC BY-NC-SA 4.0](LICENSE.txt)，Spectrum、OpenCC 等第三方代码保留各自许可与通知，见[修改与署名说明](https://github.com/102326/Degrees-of-Lewdity_Cheat_Extended-Modernization/blob/v1.20.3.1-rebuild.29/R1-NOTICE.md)。
 - 游戏作者：Vrelnir。[博客][blog] · [游戏源码][gitgud] · [英文维基][wiki-en] · [中文维基][wiki-cn] · [Discord][discord]。
 
 <details>

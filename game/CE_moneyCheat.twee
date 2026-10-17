@@ -51,11 +51,14 @@
             <div class="dol-body">
 
                 <div class="dol-desc">
-                    觀察未經原生交易入口的餘額改寫，並在控制台輸出診斷。
+                    每個遊戲秒結算未經原生交易入口的餘額淨變化，透過原生 money 記帳；開啟倍率時沿用收支倍率。
                 </div>
                 <div class="dol-desc dol-red">
-                    此監控不改寫餘額、不重放交易；正常收支由遊戲原生邏輯執行一次。
+                    只辨識採樣間的淨額，無法區分發薪與手動修正。修正餘額前請先關閉；讀檔及重新開啟會重建基線，不追補停用期間變化。原生交易不重複結算。
                 </div>
+                <<if window.CE_moneyWatch && window.CE_moneyWatch.error>>
+                    <div class="dol-desc dol-red">收支路由已暫停：請查看控制台並核對餘額及 moneyStats。可能已有部分效果，系統不自動重試或回滾；處理後關閉再開啟監控。</div>
+                <</if>>
                 <br>
 
                 <<if $CE_moneyWatchEnabled is undefined>>
@@ -64,6 +67,7 @@
 
                 <div class="dol-btn"><<button "Money Watch">>
                     <<set $CE_moneyWatchEnabled = $CE_moneyWatchEnabled ? false : true>>
+                    <<run window.CE_moneyWatch && window.CE_moneyWatch.reset()>>
                     <<replace #CE_settingsDiv>><<CE_moneyCheat>><br><br><</replace>>
                 <</button>></div>
                 <br>
