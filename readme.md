@@ -2,9 +2,9 @@
 
 Cheat Extended（作弊拓展）的独立重制项目，基于 [chris81605 的原作](https://github.com/chris81605/Degrees-of-Lewdity_Cheat_Extended)。保留原有菜单和操作入口，重点修复功能行为，整理 Hook、事件与临时资源的生命周期，逐步替换已停止维护的 Simple Framework 接入。
 
-当前公开版本为 **1.20.3.1-rebuild.28 限定测试版（Pre-release）**。任何玩家都可以下载试用，建议使用独立副本或可回滚环境；尚不作为面向所有旧用户直接覆盖升级的稳定版。
+当前正式版本为 **1.20.3.1-rebuild.28**，沿用已验证的冻结运行包。支持范围以本页列出的实测组合和升级路径为准；首次升级请保留旧包与原存档备份。
 
-[下载限定测试版](https://github.com/102326/Degrees-of-Lewdity_Cheat_Extended-Modernization/releases/tag/v1.20.3.1-rebuild.28) · [安装与已知边界](https://github.com/102326/Degrees-of-Lewdity_Cheat_Extended-Modernization/releases/download/v1.20.3.1-rebuild.28/LIMITED-TEST-NOTES.md) · [本版源码](https://github.com/102326/Degrees-of-Lewdity_Cheat_Extended-Modernization/tree/v1.20.3.1-rebuild.28) · [反馈模板](https://github.com/102326/Degrees-of-Lewdity_Cheat_Extended-Modernization/releases/download/v1.20.3.1-rebuild.28/FEEDBACK-TEMPLATE.md)
+[下载正式版](https://github.com/102326/Degrees-of-Lewdity_Cheat_Extended-Modernization/releases/tag/v1.20.3.1-rebuild.28) · [安装与已知边界](https://github.com/102326/Degrees-of-Lewdity_Cheat_Extended-Modernization/releases/download/v1.20.3.1-rebuild.28/RELEASE-NOTES.md) · [本版源码](https://github.com/102326/Degrees-of-Lewdity_Cheat_Extended-Modernization/tree/v1.20.3.1-rebuild.28) · [问题反馈](https://github.com/102326/Degrees-of-Lewdity_Cheat_Extended-Modernization/issues)
 
 ## 项目提供什么
 
@@ -50,9 +50,9 @@ CE 提供角色属性与战斗调整、金钱和时间控制、随身衣柜与�
 | Windows | Chrome `155.0.8059.84`，使用测试 APK 的游戏资产，仅移除两条 Cordova 桥标签 |
 | Android | Android `17` / WebView `154.0.8037.58` |
 
-Windows 结果覆盖 Chrome 浏览器宿主，未验收 Windows 封装 App 或 Cordova 桥。固定上游源码生成的代表性旧版样本，已在 Windows 完成读入、另存、跨文档再读及重置检查；**原作者发行 ZIP、真实玩家长期旧档和 Android 升级尚未验证**。其它版本、设备与 Mod 组合也不在当前验证范围内。
+Windows 结果覆盖 Chrome 浏览器宿主，未验收 Windows 封装 App 或 Cordova 桥。Windows 已完成固定上游源码生成样本的升级检查；Android 已完成原作者实际发行 ZIP（包内版本 `1.20.3.1`）生成样本的读入、另存、真实 App 重启、再读及重置。**真实玩家长期旧档、其它历史 CE 版本、Simple-only 环境迁移及新版档向旧版降级未验证**。其它设备和 Mod 组合也不在当前验证范围内。
 
-发布页概述本版变化；[限定测试说明](https://github.com/102326/Degrees-of-Lewdity_Cheat_Extended-Modernization/releases/download/v1.20.3.1-rebuild.28/LIMITED-TEST-NOTES.md)列出服装还原、旧手动面板、窗口归属、渲染同步及其它已知边界。开发方运行验证与独立文件复核的结论各有范围，不代表独立方重跑了全部测试。
+发布页概述本版变化；[正式版使用说明](https://github.com/102326/Degrees-of-Lewdity_Cheat_Extended-Modernization/releases/download/v1.20.3.1-rebuild.28/RELEASE-NOTES.md)列出服装还原、旧手动面板、窗口归属、渲染同步及其它已知边界。开发方运行验证与独立文件复核的结论各有范围，不代表独立方重跑了全部测试。
 
 ## 源码与反馈
 

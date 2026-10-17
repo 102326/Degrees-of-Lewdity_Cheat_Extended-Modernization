@@ -1,10 +1,10 @@
-# Cheat Extended 1.20.3.1-rebuild.28｜限定测试版
+# Cheat Extended 1.20.3.1-rebuild.28｜正式版
 
-本版是 Cheat Extended 的重制测试版本，保留原有菜单、面板和操作入口，重点修复功能行为，整理 Hook、事件与界面资源的生命周期，并退出旧 Simple Framework 接入。
+本版是 Cheat Extended 的重制版本，保留原有菜单、面板和操作入口，重点修复功能行为，整理 Hook、事件与界面资源的生命周期，并退出旧 Simple Framework 接入。
 
-这是公开下载的 **Pre-release**，欢迎在独立副本或可回滚环境中试用和反馈。尚不作为面向所有旧用户直接覆盖升级的稳定版。
+本次正式发布沿用已验证的 `1.20.3.1-rebuild.28` 冻结运行包，支持范围见下文。首次升级仍请保留旧包与原存档备份。
 
-[下载运行包](https://github.com/102326/Degrees-of-Lewdity_Cheat_Extended-Modernization/releases/download/v1.20.3.1-rebuild.28/Cheat-Extended-1.20.3.1-rebuild.28.mod.zip) · [完整安装与已知边界](https://github.com/102326/Degrees-of-Lewdity_Cheat_Extended-Modernization/releases/download/v1.20.3.1-rebuild.28/LIMITED-TEST-NOTES.md) · [本版源码](https://github.com/102326/Degrees-of-Lewdity_Cheat_Extended-Modernization/tree/v1.20.3.1-rebuild.28)
+[下载运行包](https://github.com/102326/Degrees-of-Lewdity_Cheat_Extended-Modernization/releases/download/v1.20.3.1-rebuild.28/Cheat-Extended-1.20.3.1-rebuild.28.mod.zip) · [安装、升级与已知边界](https://github.com/102326/Degrees-of-Lewdity_Cheat_Extended-Modernization/releases/download/v1.20.3.1-rebuild.28/RELEASE-NOTES.md) · [本版源码](https://github.com/102326/Degrees-of-Lewdity_Cheat_Extended-Modernization/tree/v1.20.3.1-rebuild.28)
 
 ## 本版改动
 
@@ -20,7 +20,7 @@
 
 1. 备份原 CE 包和升级前存档，保留可恢复的旧环境。
 2. 下载上方 `.mod.zip`，通过 ModLoader 或所用管理器的正常导入入口安装，同一环境保留一份 CE。
-3. 按依赖提示安装并重启游戏，确认版本为 `1.20.3.1-rebuild.28`。首次试用请另存，不要覆盖唯一旧档。
+3. 按依赖提示安装并重启游戏，确认版本为 `1.20.3.1-rebuild.28`。首次升级请另存，不要覆盖唯一旧档。
 
 | 包内依赖声明 | 版本范围 |
 | --- | --- |
@@ -41,20 +41,24 @@
 | Windows | Chrome `155.0.8059.84`，使用测试 APK 游戏资产，仅移除两条 Cordova 桥标签；未验收 Windows 封装 App 或 Cordova 桥。 |
 | Android | Android `17` / WebView `154.0.8037.58`。 |
 
-固定上游 `1.20.3.1` 源码生成的代表性旧版样本，已在 Windows 完成读入、另存、跨文档再读及设置重置。**原作者发行 ZIP、真实玩家长期旧档和 Android 升级尚未验证，不保证任意旧用户可直接覆盖升级。** 开发方运行验证与独立文件复核分别保留各自范围。
+Android 已使用原作者 [1.20.3 Release](https://github.com/chris81605/Degrees-of-Lewdity_Cheat_Extended/releases/tag/1.20.3) 中包内版本为 `1.20.3.1` 的实际发行 ZIP，原生生成代表性配置，仅替换 CE 后完成读入、另存、真实 App 重启、再读及重置。覆盖偏好、保存型 RawHook 的配置与实际效果、肤色/眼色及服装特质。旧包样本中的 Hook 重启后失效，rebuild.28 读取同一规则后恢复有效。
+
+Windows 已完成固定上游源码生成样本的对应升级检查。两种输入分别记录。**真实玩家长期旧档、其它历史 CE 版本、Simple-only 环境迁移及新版档向旧版降级未验证，不保证任意旧档无条件覆盖升级。** 开发方运行验证与独立文件复核各按其范围使用。
 
 新版保存不保证旧版可读，回滚依靠升级前的包与存档备份。停用或重置不会撤销已经发生的金钱、时间、库存、穿戴等游戏效果，也不等于恢复全部外观。
 
-服装单件还原与批量撤销、关闭自动预设后仍可操作的旧手动面板、排序窗口归属及外观刷新时机，详见[限定测试说明](https://github.com/102326/Degrees-of-Lewdity_Cheat_Extended-Modernization/releases/download/v1.20.3.1-rebuild.28/LIMITED-TEST-NOTES.md)。Windows 测试准备中曾出现一次原生天气背景异步回调异常，根因仍为 **unknown**，未证明由 CE 引起；后续通过的结论仅覆盖已记录步骤。其它设备、版本和 Mod 组合未验证。
+服装单件还原与批量撤销、关闭自动预设后仍可操作的旧手动面板、排序窗口归属及外观刷新时机，详见[正式版使用说明](https://github.com/102326/Degrees-of-Lewdity_Cheat_Extended-Modernization/releases/download/v1.20.3.1-rebuild.28/RELEASE-NOTES.md)。Windows 测试准备中曾出现一次原生天气背景异步回调异常，根因仍为 **unknown**，未证明由 CE 引起；后续通过的结论仅覆盖已记录步骤。其它设备、版本和 Mod 组合未验证。
 
 ## 附件与校验
 
 | 附件 | 用途 |
 | --- | --- |
 | [Cheat-Extended-1.20.3.1-rebuild.28.mod.zip](https://github.com/102326/Degrees-of-Lewdity_Cheat_Extended-Modernization/releases/download/v1.20.3.1-rebuild.28/Cheat-Extended-1.20.3.1-rebuild.28.mod.zip) | 可导入的冻结运行包。 |
-| [LIMITED-TEST-NOTES.md](https://github.com/102326/Degrees-of-Lewdity_Cheat_Extended-Modernization/releases/download/v1.20.3.1-rebuild.28/LIMITED-TEST-NOTES.md) | 安装、回滚与已知边界。 |
+| [RELEASE-NOTES.md](https://github.com/102326/Degrees-of-Lewdity_Cheat_Extended-Modernization/releases/download/v1.20.3.1-rebuild.28/RELEASE-NOTES.md) | 安装、回滚与已知边界。 |
 | [SHA256SUMS.txt](https://github.com/102326/Degrees-of-Lewdity_Cheat_Extended-Modernization/releases/download/v1.20.3.1-rebuild.28/SHA256SUMS.txt) | 运行包、玩家说明与反馈模板的 SHA-256。 |
 | [FEEDBACK-TEMPLATE.md](https://github.com/102326/Degrees-of-Lewdity_Cheat_Extended-Modernization/releases/download/v1.20.3.1-rebuild.28/FEEDBACK-TEMPLATE.md) | 问题反馈模板。 |
+
+附带的 `LIMITED-TEST-NOTES.md` 保留为预发布时的历史说明；当前安装与支持范围以 `RELEASE-NOTES.md` 为准。
 
 运行 ZIP 的 SHA-256：
 
@@ -68,4 +72,4 @@
 
 原 Mod 作者为 [chris81605](https://github.com/chris81605)，重制维护为 [102326](https://github.com/102326)，保留隨風飄逸及其它原贡献者署名。本项目为独立衍生维护，不代表原作者正式发行或背书。沿用 CC BY-NC-SA 4.0，包内 Spectrum（MIT）、OpenCC（Apache 2.0）等第三方代码保留各自许可与通知。
 
-反馈时请使用附件模板，提供 CE、游戏与框架版本、触发步骤、预期和实际结果，可选附脱敏截图或日志，无需默认提供完整存档。优先处理数据风险、功能失效和高频问题。
+请在[仓库 Issues](https://github.com/102326/Degrees-of-Lewdity_Cheat_Extended-Modernization/issues)使用附件模板反馈，提供 CE、游戏与框架版本、触发步骤、预期和实际结果，可选附脱敏截图或日志，无需默认提供完整存档。优先处理数据风险、功能失效和高频问题。
