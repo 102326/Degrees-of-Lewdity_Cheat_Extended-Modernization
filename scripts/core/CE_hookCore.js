@@ -335,6 +335,7 @@ maxDepth 越高，
             delete: options.delete,
             orderKey: options.orderKey,
             scope: options.scope,
+            base: options.base,
             isEnabled: options.isEnabled
         }, options.owner, options.preserveOrder);
 
@@ -343,7 +344,13 @@ maxDepth 越高，
     
     function unregister(varPath, owner){
         registrations.unregister(varPath, owner);
-        if (!registry[varPath]) delete installed[varPath];
+        if (!registry[varPath]) {
+            const binding = installed[varPath];
+            delete installed[varPath];
+            if (binding && binding.obj[binding.key] === binding.proxy) {
+                binding.obj[binding.key] = window.CE_hookIdentity.raw(binding.proxy);
+            }
+        } else installDeepProxyHook(varPath);
         log("unregister:", varPath);
     }
 
@@ -509,6 +516,13 @@ maxDepth 越高，
                     return proxyCache.get(targetObj);
                 }
 
+                function isCurrentTarget() {
+                    if (!isActive()) return false;
+                    const current = getParentAndKey(currentPath);
+                    return current && window.CE_hookIdentity.raw(current.obj[current.key]) ===
+                        window.CE_hookIdentity.raw(targetObj);
+                }
+
                 const proxy = new Proxy(targetObj, {
 
                     /* =========================
@@ -532,7 +546,7 @@ maxDepth 越高，
 
                         const value = Reflect.get(obj, prop, receiver);
 
-                        if (!isActive() || !config.deep){
+                        if (!isCurrentTarget() || !config.deep){
                             return value;
                         }
 
@@ -581,7 +595,7 @@ maxDepth 越高，
 
                     set(obj, prop, value, receiver){
 
-                        if (!isActive()) return Reflect.set(obj, prop, value, receiver);
+                        if (!isCurrentTarget()) return Reflect.set(obj, prop, value, receiver);
 
                         const propName = String(prop);
                         const fullPath = `${currentPath}.${propName}`;
@@ -637,7 +651,7 @@ maxDepth 越高，
 
                         const result = Reflect.set(obj, prop, finalValue, receiver);
 
-                        if (typeof config.after === "function"){
+                        if (result && typeof config.after === "function"){
                             try{
                                 config.after(oldValue, finalValue, ctx);
                             }catch(e){
@@ -665,7 +679,7 @@ maxDepth 越高，
 
                     deleteProperty(obj, prop){
 
-                        if (!isActive()) return Reflect.deleteProperty(obj, prop);
+                        if (!isCurrentTarget()) return Reflect.deleteProperty(obj, prop);
 
                         const propName = String(prop);
                         const fullPath = `${currentPath}.${propName}`;
@@ -794,8 +808,13 @@ maxDepth 越高，
     對外 API
     ===================================================== */
 
+    function unregisterOwner(owner) {
+        for (const path of registrations.pathsForOwner(owner)) unregister(path, owner);
+    }
+
     window.DeepProxyHook = {
         register,
+        unregisterOwner,
         unregister,
         installAll
     };
@@ -1025,6 +1044,7 @@ Cheat Extended - RawHook 原始變數攔截框架
             after: options.after,
             orderKey: options.orderKey,
             scope: options.scope,
+            base: options.base,
             isEnabled: options.isEnabled
         }, options.owner, options.preserveOrder);
 
@@ -1033,7 +1053,9 @@ Cheat Extended - RawHook 原始變數攔截框架
     
     function unregister(varPath, owner){
         registrations.unregister(varPath, owner);
-        if (!registry[varPath]) delete installed[varPath];
+        if (!registry[varPath]) {
+            retireBinding(varPath);
+        }
         log("unregister:", varPath);
     }
 
@@ -1059,9 +1081,18 @@ Cheat Extended - RawHook 原始變數攔截框架
             events[varPath] = [];
         }
 
-        events[varPath].push(callback);
+        const listener = (...args) => callback(...args);
+        events[varPath].push(listener);
 
         log("event registered:", varPath);
+        let subscribed = true;
+        return () => {
+            if (!subscribed) return;
+            subscribed = false;
+            const index = events[varPath]?.indexOf(listener) ?? -1;
+            if (index >= 0) events[varPath].splice(index, 1);
+            if (!events[varPath]?.length) delete events[varPath];
+        };
     }
 
 
@@ -1071,16 +1102,30 @@ Cheat Extended - RawHook 原始變數攔截框架
     對指定變數安裝 setter hook
     ===================================================== */
 
+    // Retire before detaching so a returning object never wraps an obsolete CE accessor.
+    function retireBinding(path) {
+        const binding = installed[path];
+        delete installed[path];
+        if (!binding) return;
+        const current = Object.getOwnPropertyDescriptor(binding.obj, binding.key);
+        if (!current || !Reflect.ownKeys(binding.descriptor).every(key => current[key] === binding.descriptor[key])) return;
+        const original = binding.original;
+        Object.defineProperty(binding.obj, binding.key,
+            original && ('get' in original || 'set' in original) ? original : {
+                ...(original ?? { writable: true, enumerable: true }), value: binding.read(), configurable: true
+            });
+    }
+
     function installRawHook(path){
 
         try{
 
-            if (installed[path] && installed[path].state !== State.variables) delete installed[path];
+            if (installed[path] && installed[path].state !== State.variables) retireBinding(path);
             const resolved = getParentAndKey(path);
             const stale = installed[path];
             if (stale && (stale.state !== State.variables || !resolved ||
                 stale.obj !== resolved.obj || !(resolved.key in resolved.obj) ||
-                Object.getOwnPropertyDescriptor(resolved.obj, resolved.key)?.set !== stale.setter)) delete installed[path];
+                Object.getOwnPropertyDescriptor(resolved.obj, resolved.key)?.set !== stale.setter)) retireBinding(path);
 
             if (!resolved){
                 warn("path not found:", path);
@@ -1101,6 +1146,7 @@ Cheat Extended - RawHook 原始變數攔截框架
                 Object.getOwnPropertyDescriptor(obj, key)?.set === previous.setter) return;
 
             const boundState = State.variables;
+            const original = Object.getOwnPropertyDescriptor(obj, key);
             let _value = obj[key];
 
             log("install hook:", path);
@@ -1123,7 +1169,7 @@ Cheat Extended - RawHook 原始變數攔截框架
 
                         // Old aliases must not execute rules from the current save.
                         const current = getParentAndKey(path);
-                        if (State.variables !== boundState || current?.obj !== obj ||
+                        if (installed[path]?.setter !== descriptor.set || State.variables !== boundState || current?.obj !== obj ||
                             Object.getOwnPropertyDescriptor(obj, key)?.set !== descriptor.set) return;
 
                         // RawHook 未啟用
@@ -1229,7 +1275,7 @@ Cheat Extended - RawHook 原始變數攔截框架
 
                         if (events[path]){
 
-                            for (const cb of events[path]){
+                            for (const cb of [...events[path]]){
                                 try{
                                     cb(old, finalValue, newValue);
                                 }catch(e){
@@ -1245,7 +1291,8 @@ Cheat Extended - RawHook 原始變數攔截框架
                 }
             };
             Object.defineProperty(obj, key, descriptor);
-            installed[path] = { obj, state: boundState, setter: descriptor.set };
+            installed[path] = { obj, key, original, state: boundState, setter: descriptor.set,
+                descriptor: Object.getOwnPropertyDescriptor(obj, key), read: () => _value };
         }
         catch(e){
             delete installed[path];
@@ -1293,8 +1340,13 @@ Cheat Extended - RawHook 原始變數攔截框架
     對外 API
     ===================================================== */
 
+    function unregisterOwner(owner) {
+        for (const path of registrations.pathsForOwner(owner)) unregister(path, owner);
+    }
+
     window.RawHook = {
         register,
+        unregisterOwner,
         unregister,
         installAll,
         on
@@ -1689,6 +1741,7 @@ VarHook.on(...)
             after: options.after,
             orderKey: options.orderKey,
             scope: options.scope,
+            base: options.base,
             isEnabled: options.isEnabled
         }, options.owner, options.preserveOrder);
 
@@ -1697,7 +1750,9 @@ VarHook.on(...)
     
     function unregister(varPath, owner){
         registrations.unregister(varPath, owner);
-        if (!registry[varPath]) delete installed[varPath];
+        if (!registry[varPath]) {
+            retireBinding(varPath);
+        }
         log("unregister:", varPath);
     }
 
@@ -1728,9 +1783,18 @@ VarHook.on(...)
             events[varPath] = [];
         }
 
-        events[varPath].push(callback);
+        const listener = (...args) => callback(...args);
+        events[varPath].push(listener);
 
         log("event registered:", varPath);
+        let subscribed = true;
+        return () => {
+            if (!subscribed) return;
+            subscribed = false;
+            const index = events[varPath]?.indexOf(listener) ?? -1;
+            if (index >= 0) events[varPath].splice(index, 1);
+            if (!events[varPath]?.length) delete events[varPath];
+        };
     }
 
 
@@ -1740,16 +1804,30 @@ VarHook.on(...)
     對指定變數安裝 setter hook
     ===================================================== */
 
+    // Retire before detaching so a returning object never wraps an obsolete CE accessor.
+    function retireBinding(path) {
+        const binding = installed[path];
+        delete installed[path];
+        if (!binding) return;
+        const current = Object.getOwnPropertyDescriptor(binding.obj, binding.key);
+        if (!current || !Reflect.ownKeys(binding.descriptor).every(key => current[key] === binding.descriptor[key])) return;
+        const original = binding.original;
+        Object.defineProperty(binding.obj, binding.key,
+            original && ('get' in original || 'set' in original) ? original : {
+                ...(original ?? { writable: true, enumerable: true }), value: binding.read(), configurable: true
+            });
+    }
+
     function installVarHook(path){
 
         try{
 
-            if (installed[path] && installed[path].state !== State.variables) delete installed[path];
+            if (installed[path] && installed[path].state !== State.variables) retireBinding(path);
             const resolved = getParentAndKey(path);
             const stale = installed[path];
             if (stale && (stale.state !== State.variables || !resolved ||
                 stale.obj !== resolved.obj || !(resolved.key in resolved.obj) ||
-                Object.getOwnPropertyDescriptor(resolved.obj, resolved.key)?.set !== stale.setter)) delete installed[path];
+                Object.getOwnPropertyDescriptor(resolved.obj, resolved.key)?.set !== stale.setter)) retireBinding(path);
 
             if (!resolved){
                 warn("path not found:", path);
@@ -1770,6 +1848,7 @@ VarHook.on(...)
                 Object.getOwnPropertyDescriptor(obj, key)?.set === previous.setter) return;
 
             const boundState = State.variables;
+            const original = Object.getOwnPropertyDescriptor(obj, key);
             let _value = obj[key];
 
             log("install hook:", path);
@@ -1792,7 +1871,7 @@ VarHook.on(...)
 
                         // Old aliases must not execute rules from the current save.
                         const current = getParentAndKey(path);
-                        if (State.variables !== boundState || current?.obj !== obj ||
+                        if (installed[path]?.setter !== descriptor.set || State.variables !== boundState || current?.obj !== obj ||
                             Object.getOwnPropertyDescriptor(obj, key)?.set !== descriptor.set) return;
 
                         const macroLock = setup.CE_macroLock;
@@ -1947,7 +2026,7 @@ VarHook.on(...)
 
                         if (events[path]){
 
-                            for (const cb of events[path]){
+                            for (const cb of [...events[path]]){
                                 try{
                                     cb(old, newValueFinal, adjustedDiff);
                                 }catch(e){
@@ -1963,7 +2042,8 @@ VarHook.on(...)
                 }
             };
             Object.defineProperty(obj, key, descriptor);
-            installed[path] = { obj, state: boundState, setter: descriptor.set };
+            installed[path] = { obj, key, original, state: boundState, setter: descriptor.set,
+                descriptor: Object.getOwnPropertyDescriptor(obj, key), read: () => _value };
         }
         catch(e){
             delete installed[path];
@@ -2011,8 +2091,13 @@ VarHook.on(...)
     對外 API
     ===================================================== */
 
+    function unregisterOwner(owner) {
+        for (const path of registrations.pathsForOwner(owner)) unregister(path, owner);
+    }
+
     window.VarHook = {
         register,
+        unregisterOwner,
         unregister,
         installAll,
         on

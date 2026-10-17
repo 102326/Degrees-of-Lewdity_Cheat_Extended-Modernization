@@ -208,5 +208,9 @@
         }
     }
 
-    if (typeof $ === "function") $(document).on(":passagestart", run);
+    setup.CE_features.register('farm-automation', () => {
+        $(document).on(':passagestart', run);
+        return () => $(document).off(':passagestart', run);
+    });
+    setup.CE_features.enable('farm-automation');
 })();

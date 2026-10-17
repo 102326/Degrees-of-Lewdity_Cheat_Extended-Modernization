@@ -6,36 +6,11 @@
     更新模型顯示
     ------------------------- */
 function refreshEyesSidebar(useFullRedraw = false, delay = 50) {
-    setTimeout(() => {
-        if (useFullRedraw) {
-            Renderer.lastAnimation.stop();
-            Renderer.animateLayersAgain();
-        } else {
-            Renderer.lastAnimation.invalidateCaches();
-            Renderer.lastAnimation.redraw();
-        }
-        //Renderer.CanvasModelCaches = {};
-        Wikifier.wikifyEval('<<updatesidebarimg true>>');
-    }, delay);
+    setup.CE_appearanceRendering.refresh(useFullRedraw, delay);
 }
 
 function pushCustomEyesToSetup(){
-    if(!Array.isArray(V.customEye)) return;
-
-    // 只新增尚未存在的自訂眼色
-    V.customEye.forEach(e => {
-        const idx = setup.colours.eyes.findIndex(eye => eye.variable === e.variable);
-        if(idx === -1){
-            setup.colours.eyes.push({...e});
-        } else {
-            // 覆蓋原本物件，但保留 reference key（避免重複）
-            setup.colours.eyes[idx] = {...e};
-        }
-    });
-    
-    // 原版顏色定義後會執行這段建立setup.colours.eyes_map，供後續使用
-    setup.colours.eyes_map = {};
-    buildColourMap("eyes");
+    setup.CE_customColours.project('eyes', Array.isArray(V.customEye) ? V.customEye : []);
 }
 
 function setPlayerEyeColour(variable, which='both'){
@@ -43,27 +18,6 @@ function setPlayerEyeColour(variable, which='both'){
     if(which==='right' || which==='both') V.rightEyeColour = variable;
     refreshEyesSidebar();
 }
-
-function checkCEC() {    
-    console.log(`[cheat extended][eyesCustom] 🧾 正在執行瞳色資料檢查……`);
-    setup.eyeCustomInit = true; 
-} 
-
-Save.onLoad.add(() => checkCEC());
-
-$(document).one(':passageinit', () => { 
-    if(V.customEye) checkCEC(); 
-});
-
-$(document).on(':passagedisplay', () => {
-	if(!setup.eyeCustomInit) return;
-
-	if(Array.isArray(V.customSkin)){	
-	    console.log('[cheat extended][eyesCustom] 🔹 初始化自訂瞳色...');	
-		pushCustomEyesToSetup();
-		delete setup.eyeCustomInit;
-	}
-});
 
 Macro.add('eyeCustomManager', {
     handler() {
@@ -211,7 +165,7 @@ Macro.add('eyeCustomManager', {
                     const removed = V.customEye.splice(idx, 1)[0];
 
                     // 更新 setup.colours.eyes
-                    setup.colours.eyes = setup.colours.eyes.filter(e => e.variable !== removed.variable);
+                    pushCustomEyesToSetup();
 
                     // 如果正在使用，切換到 fallback
                     if (V.leftEyeColour === removed.variable || V.rightEyeColour === removed.variable) {
@@ -241,7 +195,9 @@ Macro.add('eyeCustomManager', {
             addBtn.style.marginTop='6px';
             addBtn.textContent='＋ 新增眼色';
             addBtn.onclick=()=>{
-                const id=V.customEye.length+1;
+                let id = 1;
+                const used = new Set([...setup.colours.eyes, ...V.customEye].map(e => e.variable));
+                while (used.has(`eye${id}`)) id++;
                 V.customEye.push({
                     variable:`eye${id}`,
                     name:`自訂眼色${id}`,

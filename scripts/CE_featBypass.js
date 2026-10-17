@@ -1,54 +1,25 @@
-function patchEarnFeatMacro() {
-    const macro = Macro.get('earnFeat');
-    if (!macro || macro._CE_patched) return;
-
-    console.log('[cheat Extended] 🧩 宏 earnFeat 已Hook');
-
-    const originalHandler = macro.handler;
-    
-    macro.handler = function earnFeatPatched() {
-        const featName = this.args[0];
-        console.log(`[cheat Extended] ▶ 執行 earnFeat: ${featName}`);
-
-        // 🚪 檢查全局開關
-        if (!V.CE_featBypass) {
-            console.log('[cheat Extended] ❌ 無視限制獲取成就：功能開關關閉，執行原始宏');
-            return originalHandler.call(this);
+/* Bypass only during one original earnFeat call; never unlock the save permanently. */
+setup.CE_features.register('achievement', () => {
+    CE_MacroHook.hookMacro('earnFeat', {
+        owner: 'builtin:achievement', base: true, cheatVar: 'CE_featBypass',
+        around(original, ...args) {
+            if (!V.CE_featBypass) return original.apply(this, args);
+            const state = State.variables;
+            const fields = [[state.feats, 'locked', false], [state, 'cheatsEnabled', false],
+                [state, 'debug', false], [state, 'statFreeze', false], [state.settings, 'allureModifier', 1]];
+            const saved = fields.filter(([target]) => target).map(([target, key, value]) =>
+                ({ target, key, value, old: target[key], own: Object.hasOwn(target, key) }));
+            try {
+                for (const { target, key, value } of saved) target[key] = value;
+                return original.apply(this, args);
+            } finally {
+                for (const { target, key, old, own } of saved) {
+                    if (own) target[key] = old;
+                    else delete target[key];
+                }
+            }
         }
-        
-        V.feats.locked = false;
-        console.log('[cheat Extended] 🔓 無視限制獲取成就：功能開關開啟，跳過條件檢查');
-
-        const backup = {
-            featLock: V.feats.locked,
-            cheatsEnabled: V.cheatsEnabled,
-            debug: V.debug,
-            statFreeze: V.statFreeze,
-           // gamemode: V.gamemode,
-            allureModifier: V.settings?.allureModifier,
-        };
-
-        V.feats.locked = false;
-        V.cheatsEnabled = false;
-        V.debug = false;
-        V.statFreeze = false;
-        if (V.settings) V.settings.allureModifier = 1;
-
-        try {
-            return originalHandler.call(this);
-        } finally {
-            V.cheatsEnabled = backup.cheatsEnabled;
-            V.debug = backup.debug;
-            V.statFreeze = backup.statFreeze;
-           // V.gamemode = backup.gamemode;
-            if (V.settings) V.settings.allureModifier = backup.allureModifier;
-
-            console.log('[cheat Extended] 🔒 無視限制獲取成就：狀態已還原');
-        }
-    };
-
-    macro._CE_patched = true;
-}
-
-// 調用 patch
-patchEarnFeatMacro();
+    });
+    return () => CE_MacroHook.unregisterOwner('builtin:achievement');
+});
+$(document).one(':passagestart', () => setup.CE_features.enable('achievement'));

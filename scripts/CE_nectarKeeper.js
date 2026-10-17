@@ -2,7 +2,7 @@
 // boot.json本腳本需放置於CE_Time_Event.js下放避免錯誤
 // 功能：蜜飲者特質鎖定，不用天天找花蜜喝了
 
-registerCE_genericTimeEvent('onDay', 'CE_蜜飲者特質鎖定', () => {
+registerCE_timeFeature('nectar-keeper', [['onDay', 'CE_蜜飲者特質鎖定', () => {
     // 初始化控制變量，避免 undefined
     if (V.CE_nectarKeeperEnabled === undefined) V.CE_nectarKeeperEnabled = false;
     
@@ -18,4 +18,4 @@ registerCE_genericTimeEvent('onDay', 'CE_蜜飲者特質鎖定', () => {
         V.nectar_timer ++;  
         V.nectar_timer = Math.max(0, V.nectar_timer);      
     }   
-});
+}]]);

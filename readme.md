@@ -10,10 +10,9 @@
 - 重构维护：[102326](https://github.com/102326)。原作及第三方素材的权利与署名继续保留，不因重构而转移。
 - 原项目许可证：[CC BY-NC-SA 4.0](LICENSE.txt)；Spectrum、OpenCC 等第三方通知按各自来源保留，详见 [修改与署名说明](R1-NOTICE.md)。
 
-当前为 **CE-R1 研究阶段**：功能重制第一、未来维护第二、UI 美化最后。
-已完成内容、构建入口和验证范围见 [R1 工程记录](docs/R1.md)。
-这是独立维护的衍生重构项目，不代表原作者正式发行或对本次修改的背书。
-R1.2 修复父子 Hook 组合回归和跨档恢复优先级；源码与离线组合验证通过，等待真实宿主验证。真实游戏加载、Patch 命中与 Windows/Android 验收尚未完成。
+当前已启动 **CE 重制工程**：功能第一，未来维护第二，UI 最后。
+当前源码、阶段结果与覆盖边界见 [重制地图](CE_REBUILD_MAP.md)；R1.2 的 Windows / Android 定向验收见 [验收记录](docs/ACCEPTANCE_WINDOWS_ANDROID_20261016.md)。
+这是独立维护的衍生项目，不代表原作者正式发行或对修改的背书。本地 rebuild 候选尚未正式发布。
 
 以下保留原项目的功能说明、贡献名单与游戏来源：
 
@@ -27,9 +26,13 @@ R1.2 修复父子 Hook 组合回归和跨档恢复优先级；源码与离线组
 - [遊戲源碼倉庫][gitgud]  
 
 ## 前置需求
-- [MODLOADER][JML]  
+- Degrees of Lewdity `>=0.5.12.13`。manifest 的 `GameVersion` 是游戏版本约束，由 Loader 的 CheckGameVersion 组件读取实际游戏版本后校验，无需另找同名 Mod。宿主未提供有效版本信息时，应先检查游戏包与该校验组件；CE 不伪造版本或跳过低版本约束。
+- [MODLOADER][JML] `>=2.17.0`，以及用于原有补丁的 TweeReplacer `>=1.0.0`、ReplacePatcher `>=1.0.0`。
 - [Degrees of Lewdity 中文本地化][DOLCN]  
-- [Simple Framework][SF] 或 [maplebirchframework][MF]  
+- [maplebirchframework][MF]（声明最低版本 `>=3.2.5`，本轮代表性环境为 5.4.3；不锁单一版本）
+- 原 Simple Framework 已退役，不再作为 CE 运行依赖或回退路径。Hook Core 与纹身定义直接使用 SugarCube / DoL；现有 UI 注入、时间事件、战斗动作和 HeadMask 模型兼容使用 MapleBirch。
+- SweetAlert2Mod 为可选提示增强（代表性验证为 `1.1.0`）。未安装或没有可调用接口时，环境错误与下一步处理信息通过原生 alert 显示。CE 不再把它列为硬依赖，其它 Mod 的安装要求仍需满足。
+- CE 不直接调用 ImageLoaderHook API、不自带图片，也未注册该插件；因此不再重复声明它。当前 MapleBirch5.4.3 → BeautySelectorAddon2.9.0 仍间接要求 ImageLoaderHook。不要因 CE 的声明精简而卸载组合中需要的图片加载组件；HeadMask 仍通过 Maple 的角色渲染接口使用原游戏图片路径。
 
 ---
 
@@ -147,10 +150,13 @@ R1.2 修复父子 Hook 组合回归和跨档恢复优先级；源码与离线组
   * 自動恢復／鎖定服裝耐久
 - 服裝類型管理 Plus
   * 可為不同服裝分別自訂特質，換裝或讀檔後仍會保留設定
-  * 支援單件還原及全部還原
+  * 「套回初始特質」立即套回該定義物件初次記錄的特質，並同步目前穿著的同件服裝；稍後校正或停用時，定義仍可能回到 CE 介入前的第三方版本。
+  * 「撤銷全部覆寫」刪除保存的覆寫、交還服裝定義並同步相關穿著，保留第三方後續修改；與單件套回初始特質的結果可能不同。
+  * 動態定義替換不保證即時跟隨。配置未變可能命中快取；開發用 `setup.CEClothTraitEditor.refresh()`、重新啟用或讀檔會重新套用。
 - 服裝類型管理（舊版）
   * 僅修改**當前**穿著服裝的特質
   * 已移至 Plus 介面內，僅保留功能    
+  * 自動預設模組停用只停止自動套用；已開啟面板的手動套用／還原仍可操作。停用期間不開啟新面板。
 
 ### 🪄 魔術迴路
 - 自訂義紋身文字 / 屬性  

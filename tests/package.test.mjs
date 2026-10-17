@@ -14,6 +14,8 @@ test('original manifest reproduces the missing input; current manifest rejects u
   await assert.rejects(createArchive(root, original), /Patch resource is not declared: addon-replace\/Widgets_6.txt/);
   const originalWithPatch = structuredClone(original);
   originalWithPatch.additionFile.push('addon-replace/Widgets_6.txt');
+  originalWithPatch.scriptFileList = originalWithPatch.scriptFileList.map(name =>
+    name === 'scripts/CE_hookTool.js' ? 'scripts/core/CE_hookCore.js' : name);
   await assert.rejects(createArchive(root, originalWithPatch), /Missing declared resource: addon-replace\/Widgets State Man_1.txt/);
   const missingPatch = structuredClone(boot);
   missingPatch.additionFile = missingPatch.additionFile.filter(name => !name.endsWith('Widgets_6.txt'));
@@ -22,11 +24,33 @@ test('original manifest reproduces the missing input; current manifest rejects u
 });
 
 test('early, normal and Twee contracts preserve order and all 30 original Patch declarations', () => {
-  for (const key of ['scriptFileList_inject_early', 'tweeFileList', 'styleFileList', 'dependenceInfo', 'addonPlugin']) {
+  for (const key of ['tweeFileList', 'styleFileList']) {
     assert.deepEqual(boot[key], original[key], key);
   }
+  const expectedAddons = structuredClone(original.addonPlugin);
+  const findMoney = addons => addons.find(a => a.modName === 'ReplacePatcher').params.js.find(p => p.TODO === 'function=>hook money');
+  // Changed boundaries have behavior checks using the actual replacement, not copied strings.
+  findMoney(expectedAddons).to = findMoney(boot.addonPlugin).to;
+  const findHourly = addons => addons.find(a => a.modName === 'ReplacePatcher').params.js.find(p => p.TODO === 'function=>patch earnHourlyFeats');
+  findHourly(expectedAddons).to = findHourly(boot.addonPlugin).to;
+  const findParasite = addons => addons.find(a => a.modName === 'ReplacePatcher').params.js.find(p => p.TODO === 'patch => maxParasites');
+  findParasite(expectedAddons).to = findParasite(boot.addonPlugin).to;
+  assert.deepEqual(boot.addonPlugin, expectedAddons);
+  assert.deepEqual(boot.scriptFileList_inject_early, original.scriptFileList_inject_early.filter(name => !name.endsWith('framework_detector.js')));
+  assert.deepEqual(boot.dependenceInfo, [
+    ...original.dependenceInfo.filter(d => !['SweetAlert2Mod', 'ModLoader DoL ImageLoaderHook'].includes(d.modName)),
+    {modName: 'maplebirch', version: '>=3.2.5'},
+  ]);
   const expected = [...original.scriptFileList];
   expected.splice(expected.indexOf('scripts/CE_hookTool.js'), 0, 'scripts/CE_hookRegistry.js');
+  expected[expected.indexOf('scripts/CE_hookTool.js')] = 'scripts/core/CE_hookCore.js';
+  expected.unshift('scripts/core/CE_features.js');
+  expected.splice(expected.indexOf('scripts/CE_hookSimpleUI.js'), 0, 'scripts/core/CE_customHooks.js');
+  expected.splice(expected.indexOf('scripts/CE_macroHookTool.js'), 0, 'scripts/core/CE_macroCore.js');
+  expected.splice(expected.indexOf('scripts/CE_MoneyCheat.js'), 1);
+  expected.splice(expected.indexOf('scripts/CE_statControl.js') + 1, 0, 'scripts/CE_MoneyCheat.js');
+  expected.splice(expected.indexOf('scripts/CE_customerSkinColor.js'), 0, 'scripts/CE_customColours.js', 'scripts/CE_appearanceRendering.js');
+  expected.splice(expected.indexOf('scripts/CE_forestMapGui.js'), 0, 'scripts/CE_mapView.js');
   assert.deepEqual(boot.scriptFileList, expected);
   assert.equal(boot.name, original.name);
   assert.equal(patchFiles(boot).length, 7);

@@ -1,31 +1,58 @@
-// 通用時間事件註冊函數
+// One provider for real clock-event semantics; no passage-event substitute.
 function registerCE_genericTimeEvent(eventType, eventName, callback) {
-    const logger = window.modUtils.getLogger();
-    const maplebirchMod = window.modUtils.getMod('maplebirch');
-    const simpleMod = window.modUtils.getMod('Simple Frameworks');
-
-    if (maplebirchMod) {
-        maplebirch.dynamic.regTimeEvent(eventType, eventName, {
-            action: callback,
-            priority: 0,
-            once: false
-        });
-        console.log(`[Cheat Extended] ✅ Maplebirch 已註冊事件: ${eventName} (${eventType})`);
-
-    } else if (simpleMod) {
-        new TimeEvent(eventType, eventName).Action(callback);
-        console.log(`[Cheat Extended] ✅ Simple Frameworks 已註冊事件: ${eventName} (${eventType})`);
-
-    } else {
-        logger.error('[Cheat Extended] ❌ 未檢測到 Maplebirch 或 Simple Frameworks，無法註冊事件');
-        console.error('[Cheat Extended] ❌ 未檢測到 Maplebirch 或 Simple Frameworks，無法註冊事件');
+    const dynamic = window.maplebirch?.dynamic;
+    if (typeof dynamic?.regTimeEvent !== 'function') {
+        console.error('[Cheat Extended] MapleBirch dynamic.regTimeEvent unavailable: ' + eventName);
+        return false;
     }
+    return dynamic.regTimeEvent(eventType, eventName, {
+        action: callback, priority: 0, once: false
+    });
 }
 
 window.registerCE_genericTimeEvent = registerCE_genericTimeEvent;
 
+function unregisterCE_genericTimeEvent(eventType, eventName) {
+    return window.maplebirch.dynamic.delTimeEvent(eventType, eventName);
+}
+window.unregisterCE_genericTimeEvent = unregisterCE_genericTimeEvent;
+
+// Own native clock registrations as one feature; do not replace the provider's event semantics.
+function registerCE_timeFeature(id, events) {
+    setup.CE_features.register(id, () => {
+        const owned = [];
+        let active = false;
+        const release = () => {
+            active = false;
+            let failure;
+            for (const [type, name] of owned) {
+                try { unregisterCE_genericTimeEvent(type, name); }
+                catch (error) { failure ??= error; }
+            }
+            if (failure) throw failure;
+        };
+        try {
+            for (const [type, name, action] of events) {
+                if (registerCE_genericTimeEvent(type, name, function (...args) {
+                    if (active) return action.apply(this, args);
+                }) === false) {
+                    throw new Error('[Cheat Extended] Clock registration failed: ' + id + '/' + name);
+                }
+                owned.push([type, name]);
+            }
+        } catch (error) {
+            try { release(); } catch (cleanupError) { throw new AggregateError([error, cleanupError], 'Clock feature initialization failed'); }
+            throw error;
+        }
+        active = true;
+        return release;
+    });
+    return setup.CE_features.enable(id);
+}
+window.registerCE_timeFeature = registerCE_timeFeature;
+
 // 範例使用：
-registerCE_genericTimeEvent(
+registerCE_timeFeature('daily-status', [[
     'onAfter',
     'CE_自動調溫',
     () => {
@@ -54,9 +81,7 @@ registerCE_genericTimeEvent(
             );
         }
     }
-);
-
-registerCE_genericTimeEvent(
+], [
     'onDay',
     'CE_額外狀態恢復',
     () => {
@@ -107,4 +132,4 @@ registerCE_genericTimeEvent(
             }
         });
     }
-);
+]]);

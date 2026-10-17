@@ -2,6 +2,27 @@
     "use strict";
 
     const activeCEVars = [
+        "CE_cafeBunCheat",
+        "CE_pbhairBlendMode",
+        "CE_FarmRoadMapGUI",
+        "CE_ForestMapGUI",
+        "CE_fsReqBypass",
+        "CE_HeadMaskMode",
+        "CE_averyReqPass",
+        "CE_QS_simple_open",
+        "CE_SewersMapGUI",
+        "CE_langMode",
+        "CE_wardrobePageSize",
+        "CE_menuSortEnable",
+        "CE_TP_simple_open",
+        "CE_YL_simple_open",
+        "CE_noAngelBanishLoss",
+        "CE_customHooks",
+        "CE_clothTraitOverrides",
+        "CE_allowCustomHookSave",
+        "CE_RawHook_enable",
+        "CE_DeepProxyHook_enable",
+        "teleportation_db",
         "CE_Toggle",
         "CE_YL_leftui_enable",
         "CE_milk_max",
@@ -224,6 +245,9 @@
     ]));
 
     function clearCEVars() {
+        // Release owned rules before removing their settings; other Mods keep their owners.
+        setup.CE_features.disable('custom-hooks');
+        setup.CE_runtimeCustomHooks = [];
         const V = State.variables;
         let cleared = 0;
 
@@ -233,6 +257,11 @@
                 cleared++;
             }
         });
+        try { setup.CEClothTraitEditor?.refresh(); }
+        finally {
+            for (const engine of ['VarHook', 'RawHook', 'DeepProxyHook']) V['CE_' + engine + '_enable'] = true;
+            setup.CE_features.enable('custom-hooks');
+        }
 
         console.log(`[Cheat Extended] 🔧已清除 CE 相關變數：${cleared}/${varsToClear.length}`);
     }

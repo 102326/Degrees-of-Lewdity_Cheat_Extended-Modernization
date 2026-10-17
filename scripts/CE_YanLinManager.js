@@ -1070,10 +1070,11 @@ CE Yanling +
 
     });
 
-    $(document).on(":passagestart", function () {
-
-        setup.CE_YanlingManager?.init?.();
-
+    setup.CE_features.register('yanling-store', () => {
+        const init = () => setup.CE_YanlingManager?.init?.();
+        $(document).on(':passagestart', init);
+        return () => $(document).off(':passagestart', init);
     });
+    setup.CE_features.enable('yanling-store');
 
 })();

@@ -20,9 +20,9 @@ function createCETattoos() {
 }
 
 // ----------------------------
-// 2. Maplebirch 專用：添加紋身資料到 setup
+// 2. 原生 DoL：添加紋身資料到 setup
 // ----------------------------
-function addBodyWritingForMaplebirch(tattoos) {
+function addCEBodyWriting(tattoos) {
     if (!window.setup) {
         console.error('[Cheat Extended] ❌ setup 不存在，無法添加紋身');
         return;
@@ -62,36 +62,10 @@ function addBodyWritingForMaplebirch(tattoos) {
 // 3. 註冊函數，兼容兩個框架
 // ----------------------------
 function registerCETattoos() {
-    const logger = window.modUtils.getLogger();
-    const maplebirchMod = (window.modUtils.getModListNameNoAlias().includes('maplebirch') ? window.modUtils.getAnyModByNameNoAlias('maplebirch') : undefined);
-    const simpleMod = (window.modUtils.getModListNameNoAlias().includes('Simple Frameworks') ? window.modUtils.getAnyModByNameNoAlias('Simple Frameworks') : undefined);
-
-    const tattoos = createCETattoos();
-
-    if (simpleMod) {
-        setup.modTattoos = setup.modTattoos || [];
-        setup.modTattoos.push(...tattoos);
-       // logger.log(`[Cheat Extended] ✅ Simple Frameworks 已註冊 CE 紋身，總數 ${setup.modTattoos.length}`);
-        console.log(`[Cheat Extended] ✅ Simple Frameworks 已註冊 CE 紋身，總數 ${setup.modTattoos.length}`);
-    }
-
-    if (maplebirchMod) {
-        // 等待 setup.bodywriting 初始化且已有資料後再添加
-        const interval = setInterval(() => {
-            if (setup.bodywriting && Object.keys(setup.bodywriting).length > 0) {
-                addBodyWritingForMaplebirch(tattoos);
-                clearInterval(interval);
-            }
-        }, 50);
-    }
-
-    if (!simpleMod && !maplebirchMod) {
-        logger.error('[Cheat Extended] ❌ 未檢測到 Maplebirch 或 Simple Frameworks，無法註冊 CE 紋身');
-        console.error('[Cheat Extended] ❌ 未檢測到 Maplebirch 或 Simple Frameworks，無法註冊 CE 紋身');
-    }
+    if (!setup.bodywriting || Object.keys(setup.bodywriting).length === 0) return false;
+    addCEBodyWriting(createCETattoos());
+    return true;
 }
 
-// ----------------------------
-// 4. 初始化
-// ----------------------------
-registerCETattoos();
+// Story initialization owns the definitions. No polling timer or framework state.
+if (!registerCETattoos()) $(document).one(':passageinit', registerCETattoos);

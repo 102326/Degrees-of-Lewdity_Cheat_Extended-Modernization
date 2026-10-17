@@ -28,6 +28,7 @@
             <<set _BtnText = $CE_EnemyStateEnable ? "關閉HP、AP顯示" : "啟用HP、AP顯示">>
             <<button _BtnText>>
                 <<set $CE_EnemyStateEnable = !$CE_EnemyStateEnable>>
+                <<run setup.CE_enemyState.refresh()>>
                 <<replace #CE_settingsDiv>>
                     <<swich_HP_AP_display>><br><br>
                 <</replace>>

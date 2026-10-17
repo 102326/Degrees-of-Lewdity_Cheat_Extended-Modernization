@@ -17,6 +17,9 @@ export function host({ custom = false, macros = false, legacy = process.env.CE_T
       return {
         on(name, callback) { add(name, callback, false); },
         one(name, callback) { add(name, callback, true); },
+        off(name, callback) {
+          for (const event of name.split(' ')) listeners.set(event, (listeners.get(event) ?? []).filter(h => h.callback !== callback));
+        },
       };
     },
   });
@@ -39,9 +42,16 @@ export function host({ custom = false, macros = false, legacy = process.env.CE_T
     vm.runInContext(source, context, { filename: path });
   }
   if (!legacy) load('scripts/CE_hookRegistry.js');
-  load('scripts/CE_hookTool.js');
-  if (custom) load('scripts/CE_hookSimpleUI.js');
-  if (macros) load('scripts/CE_macroHookTool.js');
+  load(legacy ? 'scripts/CE_hookTool.js' : 'scripts/core/CE_hookCore.js');
+  if (!legacy) load('scripts/core/CE_features.js');
+  if (custom) {
+    if (!legacy) load('scripts/core/CE_customHooks.js');
+    load('scripts/CE_hookSimpleUI.js');
+  }
+  if (macros) {
+    if (!legacy) load('scripts/core/CE_macroCore.js');
+    load('scripts/CE_macroHookTool.js');
+  }
   return {
     c: context, warnings, macroRegistry, load,
     emit(name) {

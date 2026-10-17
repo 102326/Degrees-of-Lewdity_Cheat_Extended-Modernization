@@ -39,5 +39,9 @@
         },
     ]);
 
-    if (typeof $ === "function") $(document).on(":passagestart", restock);
+    setup.CE_features.register('vending-restock', () => {
+        $(document).on(':passagestart', restock);
+        return () => $(document).off(':passagestart', restock);
+    });
+    setup.CE_features.enable('vending-restock');
 })();

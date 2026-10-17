@@ -1023,10 +1023,10 @@ CE Teleportation+
 
     });
 
-    $(document).on(":passagestart", function () {
-
-        setup.CE_TeleportationManager?.init?.();
-
+    setup.CE_features.register('teleport-store', () => {
+        $(document).on(':passagestart', init);
+        return () => $(document).off(':passagestart', init);
     });
+    setup.CE_features.enable('teleport-store');
 
 })();

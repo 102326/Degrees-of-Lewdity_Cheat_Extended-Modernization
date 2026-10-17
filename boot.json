@@ -4,13 +4,14 @@
     "cn": "作弊拓展",
     "en": "Cheat Expansion"
   },
-  "version": "1.20.3.1-r1.2",
+  "version": "1.20.3.1-rebuild.28",
   "styleFileList": [
     "css/CE_CSS.css",
     "css/CE_EnemyStateCss.css",
     "scriptEarly/Utils/spectrum.css"
   ],
   "scriptFileList": [
+    "scripts/core/CE_features.js",
     "scripts/lan_t2s/CE_langDict.js",
     "scripts/lan_t2s/CE_lang.js",
     "scripts/CE_getTargetWarmth2.js",
@@ -27,13 +28,15 @@
     "scripts/CE_forceAttendSchool.js",
     "scripts/clearCEVars.js",
     "scripts/CE_tattoo.js",
-    "scripts/CE_MoneyCheat.js",
     "scripts/CE_cafeBunCheat.js",
     "scripts/CE_hookRegistry.js",
-    "scripts/CE_hookTool.js",
+    "scripts/core/CE_hookCore.js",
+    "scripts/core/CE_customHooks.js",
     "scripts/CE_hookSimpleUI.js",
+    "scripts/core/CE_macroCore.js",
     "scripts/CE_macroHookTool.js",
     "scripts/CE_statControl.js",
+    "scripts/CE_MoneyCheat.js",
     "scripts/CE_timeMultiplier.js",
     "scripts/CE_featBypass.js",
     "scripts/CE_featUnlocker.js",
@@ -48,12 +51,15 @@
     "scripts/CE_TransformationDG.js",
     "scripts/CE_clothTypeManager.js",
     "scripts/CE_clothTraitEditor.js",
+    "scripts/CE_customColours.js",
+    "scripts/CE_appearanceRendering.js",
     "scripts/CE_customerSkinColor.js",
     "scripts/CE_customerEyesColor.js",
     "scripts/CE_customerHairColor.js",
     "scripts/CE_inventory_helper.js",
     "scripts/CE_HeadMaskCompat.js",
     "scripts/CE_CombatSkill.js",
+    "scripts/CE_mapView.js",
     "scripts/CE_forestMapGui.js",
     "scripts/CE_sewersMapGui.js",
     "scripts/CE_farmRoadMapGui.js",
@@ -87,7 +93,6 @@
   "imgFileList": [],
   "scriptFileList_inject_early": [
     "scriptEarly/CERegist.js",
-    "scriptEarly/framework_detector.js",
     "scriptEarly/CE_environmentGuard.js",
     "scriptEarly/Utils/spectrum.js"
   ],
@@ -273,19 +278,19 @@
           {
             "TODO": "function=>hook money",
             "from": "DefineMacro(\"money\", money);",
-            "to": "window.money = money;\n\tconsole.log(\"[Cheat Extended] 🔧 money 函數已掛到全局\");\n\tDefineMacro(\"money\", money);",
+            "to": "if (!money.CE_moneyBoundary) {\n        const CE_nativeMoney = money;\n        money = function money(...args) {\n            const dispatch = window.CE_moneyTransaction;\n            return typeof dispatch === \"function\"\n                ? dispatch(CE_nativeMoney, this, args)\n                : CE_nativeMoney.apply(this, args);\n        };\n        Object.defineProperty(money, \"CE_moneyBoundary\", { value: true });\n    }\n    window.money = money;\n    DefineMacro(\"money\", money);",
             "fileName": "stat-changes.js"
           },
           {
             "TODO": "function=>patch earnHourlyFeats",
             "from": "if (V.feats.locked || V.cheatsEnabled === true || V.debug || V.gamemode === \"soft\" || V.settings.allureModifier < 1 || V.replayScene) return false;",
-            "to": "if (V.gamemode === \"soft\" || V.replayScene) return false;",
+            "to": "if ((!(V.CE_featBypass && setup.CE_features?.isEnabled(\"achievement\")) && (V.feats.locked || V.cheatsEnabled === true || V.debug || V.settings.allureModifier < 1)) || V.gamemode === \"soft\" || V.replayScene) return false;",
             "fileName": "feats.js"
           },
           {
             "TODO": "patch => maxParasites",
             "from": "switch (V.sexStats[orifice].pregnancy.motherStatus)",
-            "to": "if (V.CE_parasiteControl){\n\t\t return CE_parasiteControlLimit(orifice)\n\t};\n\tswitch (V.sexStats[orifice].pregnancy.motherStatus)",
+            "to": "if (V.CE_parasiteControl && setup.CE_features?.isEnabled(\"parasite\")){\n\t\t return CE_parasiteControlLimit(orifice)\n\t};\n\tswitch (V.sexStats[orifice].pregnancy.motherStatus)",
             "fileName": "parasite.js"
           }
         ],
@@ -312,10 +317,6 @@
       "version": ">=2.17.0"
     },
     {
-      "modName": "ModLoader DoL ImageLoaderHook",
-      "version": ">=1.0.0"
-    },
-    {
       "modName": "TweeReplacer",
       "version": ">=1.0.0"
     },
@@ -324,12 +325,12 @@
       "version": ">=1.0.0"
     },
     {
-      "modName": "SweetAlert2Mod",
-      "version": "^1.0.0"
-    },
-    {
       "modName": "GameVersion",
       "version": ">=0.5.12.13"
+    },
+    {
+      "modName": "maplebirch",
+      "version": ">=3.2.5"
     }
   ]
 }

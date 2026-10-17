@@ -71,7 +71,9 @@
             if (typeof Wikifier !== "undefined" && typeof Wikifier.wikifyEval === "function") {
                 Wikifier.wikifyEval("<<npc Avery>><<person1>>");
             }
+            const state = State.variables, passage = State.passage, turns = State.turns;
             setTimeout(() => {
+                if (State.variables !== state || State.passage !== passage || State.turns !== turns) return;
                 try {
                     const engine = (typeof SugarCube !== "undefined" && SugarCube.Engine) || (typeof Engine !== "undefined" && Engine);
                     if (!engine || typeof engine.play !== "function") throw new Error("Engine.play unavailable");
@@ -200,5 +202,9 @@
         });
     }
 
-    if (typeof $ === "function") $(document).on(":passagestart", run);
+    setup.CE_features.register('manor-automation', () => {
+        $(document).on(':passagestart', run);
+        return () => $(document).off(':passagestart', run);
+    });
+    setup.CE_features.enable('manor-automation');
 })();

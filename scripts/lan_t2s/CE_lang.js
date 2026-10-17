@@ -289,8 +289,10 @@
 	const placeholderOriginal = new WeakMap();
 	const titleOriginal = new WeakMap();
 
+	let active = false, generation = 0;
+
 	function wanted(original) {
-		return isS()
+		return active && isS()
 			? toSimplified(original)
 			: original;
 	}
@@ -300,29 +302,17 @@
 	 * ===================== */
 
 	function updateAttr(node, prop, store) {
-		if (
-			!node ||
-			typeof node[prop] !== "string"
-		) {
-			return;
-		}
-
-		let original = store.get(node);
-
-		if (original === undefined) {
-			original = node[prop];
-			store.set(
-				node,
-				original
-			);
-		}
-
-		const next = wanted(original);
-
-		if (node[prop] !== next) {
-			node[prop] = next;
-		}
-	}
+        if (!node || typeof node[prop] !== 'string') return;
+        const current = node[prop];
+        let record = store.get(node);
+        if (!record && !active) return;
+        // A game/UI update replaces our baseline; never replay cached text over a new value.
+        if (!record || current !== record.last) record = { original: current, last: current };
+        const next = wanted(record.original);
+        if (current !== next) node[prop] = next;
+        record.last = next;
+        store.set(node, record);
+    }
 
 	/* =====================
 	 * 遍歷 DOM
@@ -333,32 +323,19 @@
 			return;
 		}
 
+        // Direct observer entries must respect the same excluded ancestors as a full walk.
+        for (let element = node.nodeType === 1 ? node : node.parentElement; element; element = element.parentElement) {
+            if (SKIP.has(element.tagName)) return;
+        }
+
 		/* =====================
 		 * Text Node
 		 * ===================== */
 
 		if (node.nodeType === 3) {
-			let original = textOriginal.get(node);
-
-			if (original === undefined) {
-				original =
-					node.nodeValue ||
-					"";
-
-				textOriginal.set(
-					node,
-					original
-				);
-			}
-
-			const next = wanted(original);
-
-			if (node.nodeValue !== next) {
-				node.nodeValue = next;
-			}
-
-			return;
-		}
+            updateAttr(node, 'nodeValue', textOriginal);
+            return;
+        }
 
 		/* =====================
 		 * Element
@@ -376,7 +353,7 @@
 		 * ===================== */
 
 		if (
-			node.tagName === "INPUT" ||
+			(node.tagName === "INPUT" && ["button", "submit", "reset"].includes(node.type)) ||
 			node.tagName === "BUTTON"
 		) {
 			updateAttr(
@@ -559,9 +536,12 @@
 			return;
 		}
 
+		const epoch = generation;
 		observer = new MutationObserver(
 			mutations => {
+                if (!active || epoch !== generation) return;
 				for (const m of mutations) {
+                    if (m.type === 'characterData') { convertTree(m.target); continue; }
 					if (
 						m.type !== "childList"
 					) {
@@ -587,34 +567,22 @@
 			{
 				childList: true,
 				subtree: true,
+                characterData: true,
 			}
 		);
 	}
 
-	/* =====================
-	 * 啟動
-	 * ===================== */
-
-	function boot() {
-		installObserver();
-		refreshLang();
-	}
-
-	if (
-		document.readyState === "loading"
-	) {
-		document.addEventListener(
-			"DOMContentLoaded",
-			boot,
-			{
-				once: true,
-			}
-		);
-	} else {
-		boot();
-	}
-
-	console.log(
-		"[Cheat Extended] CE_lang 已掛載（繁體原文 / 簡體顯示）"
-	);
+    setup.CE_features.register('ce-language', () => {
+        active = true; const epoch = ++generation;
+        function boot() { if (active && epoch === generation) { installObserver(); refreshLang(); } }
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true });
+        else boot();
+        return () => {
+            active = false; generation++;
+            document.removeEventListener('DOMContentLoaded', boot);
+            try { observer?.disconnect(); }
+            finally { observer = null; refreshLang(); }
+        };
+    });
+    setup.CE_features.enable('ce-language');
 })();

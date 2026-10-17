@@ -6,7 +6,7 @@
  * 开关: V.CE_edenOutdoorLock / V.CE_autoWater（安全屋助手面板）
  * 每次 passage 切换时若开关开启则强制回满/补浇，覆盖游戏内一切重置路径。
  * 用 State.variables 取当前活对象，避免旧克隆引用。 */
-$(document).on(':passagestart', function () {
+function CE_safehouseAutomation() {
     var SV = State.variables;
     if (SV.CE_edenOutdoorLock) {
         SV.edengarden = 4;
@@ -23,7 +23,12 @@ $(document).on(':passagestart', function () {
             }
         });
     }
+}
+setup.CE_features.register('safehouse-automation', () => {
+    $(document).on(':passagestart', CE_safehouseAutomation);
+    return () => $(document).off(':passagestart', CE_safehouseAutomation);
 });
+setup.CE_features.enable('safehouse-automation');
 
 /*
  安全屋助手 (v1.20.1-dolp 繁體版)
@@ -654,6 +659,7 @@ $(document).on(':passagestart', function () {
             renderSafehouse(root);
             if (!feedback) return;
             requestAnimationFrame(() => {
+                if (!root.isConnected) return;
                 const target = root.querySelector(`[data-ce-feedback="${feedback.id}"]`);
                 if (!target) return;
                 target.innerHTML = `<span class="${feedback.success === false ? "dol-red" : "green"}">${feedback.message}</span>`;

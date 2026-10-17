@@ -5,6 +5,38 @@
     // ================================
 
     const lastPercents = Object.create(null);
+    const frames = new Set(), timers = new Set(), containers = new Set();
+    let active = false, renderEpoch = 0;
+
+    function shouldDisplay() {
+        return active && V.combat === 1 && V.stalk !== true && !!V.CE_EnemyStateEnable;
+    }
+    function rounded(value, fallback = 0) {
+        const number = Number(value);
+        return Number.isFinite(number) ? Math.round(number) : fallback;
+    }
+    function nextFrame(callback, valid) {
+        const id = requestAnimationFrame(() => { frames.delete(id); if (valid()) callback(); });
+        frames.add(id);
+    }
+    function later(callback, valid) {
+        const id = setTimeout(() => { timers.delete(id); if (valid()) callback(); }, 500);
+        timers.add(id);
+    }
+    function clearView() {
+        renderEpoch++;
+        for (const id of frames) cancelAnimationFrame(id);
+        frames.clear();
+        for (const id of timers) clearTimeout(id);
+        timers.clear();
+        for (const container of containers) container.remove();
+        containers.clear();
+    }
+    function resetAnimation() {
+        setup.CE_StateBarInitialized = false;
+        setup.CE_HadCombatBarTarget = false;
+        for (const key of Object.keys(lastPercents)) delete lastPercents[key];
+    }
     
     setup.CE_StateBarInitialized ??= false;
 
@@ -31,58 +63,28 @@
     function animateFillLag(barDiv, fillDiv, key, currentPercent, color) {
         const lastPercent = getLastPercent(key, currentPercent);
         const isOpening = !setup.CE_StateBarInitialized;
-
+        const epoch = renderEpoch, state = V;
+        const valid = () => shouldDisplay() && renderEpoch === epoch && V === state && barDiv.isConnected;
         const lagDiv = document.createElement('div');
         lagDiv.className = 'ce-enemy-state-fill-lag';
-
         lagDiv.style.background = color;
         fillDiv.style.background = color;
-
-        if (isOpening) {
-            fillDiv.style.width = '0%';
-            lagDiv.style.width = '0%';
-
-            barDiv.appendChild(lagDiv);
-            barDiv.appendChild(fillDiv);
-
-            requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                    // 背景先開始填，速度由 .ce-enemy-state-fill-lag 控制
-                    lagDiv.style.width = currentPercent + '%';
-
-                    // 前景晚一點開始填，速度由 .ce-enemy-state-fill 控制
-                    setTimeout(() => {
-                        fillDiv.style.width = currentPercent + '%';
-                        setLastPercent(key, currentPercent);
-                    }, 500);
-                });
-            });
-
-        return;
-    }
-
-        // 先放舊值
-        fillDiv.style.width = lastPercent + '%';
-
-        // lag 先放「較大的那個值」
-        // 扣血時：停在舊值
-        // 回復時：先到新值，當背景預覽
-        lagDiv.style.width = Math.max(lastPercent, currentPercent) + '%';
-
+        fillDiv.style.width = (isOpening ? 0 : lastPercent) + '%';
+        lagDiv.style.width = (isOpening ? 0 : Math.max(lastPercent, currentPercent)) + '%';
         barDiv.appendChild(lagDiv);
         barDiv.appendChild(fillDiv);
-
-        requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-                // 前景永遠平滑移到新值
+        nextFrame(() => nextFrame(() => {
+            lagDiv.style.width = currentPercent + '%';
+            if (isOpening) {
+                later(() => {
+                    fillDiv.style.width = currentPercent + '%';
+                    setLastPercent(key, currentPercent);
+                }, valid);
+            } else {
                 fillDiv.style.width = currentPercent + '%';
-
-                // lag 最後也收斂到新值
-                lagDiv.style.width = currentPercent + '%';
-
                 setLastPercent(key, currentPercent);
-            });
-        });
+            }
+        }, valid), valid);
     }
 
     // ================================
@@ -100,6 +102,7 @@
      */
     Macro.add('CE_EnemyState', {
         handler() {
+            if (!shouldDisplay()) return;
 
             /* ===== 狀態資料定義 =====
              * key   ：內部識別用（同時用於 class）
@@ -125,14 +128,14 @@
                  *  - 四捨五入
                  *  - 防止出現負值
                  */
-                let value = Math.max(Math.round(state.value), 0);
-                let max = Math.round(state.max);
+                let value = Math.max(rounded(state.value), 0);
+                let max = Math.max(0, rounded(state.max));
 
                 /* --- 條狀百分比計算 ---
                  *  - 最大不超過 100%
                  */
                 let percent = Math.min(
-                    Math.round((value / max) * 100),
+                    max > 0 ? Math.round((value / max) * 100) : 0,
                     100
                 );
 
@@ -321,6 +324,7 @@
 
     Macro.add('CE_NPCHealthBars', {
         handler: function () {
+            if (!shouldDisplay()) return;
             if (!Array.isArray(V.NPCList)) return;
 
             // 過濾出有效 NPC（有 health 屬性）
@@ -362,8 +366,8 @@
 
             // 每個有效 NPC 血條
             validNPCs.forEach((npc, i) => {
-                const value = Math.max(0, Math.round(npc.health));
-                const max = Math.max(1, Math.round(npc.healthmax || 100));
+                const value = Math.max(0, rounded(npc.health));
+                const max = Math.max(1, rounded(npc.healthmax || 100, 100));
                 const percent = Math.min(100, Math.round((value / max) * 100));
                 const name = npc.fullDescription || `NPC ${i + 1}`;
 
@@ -421,13 +425,15 @@
 
     Macro.add('CE_TentacleState', {
         handler() {
+            if (!shouldDisplay()) return;
 
-            if (!V.tentacles || !Number(V.tentacles.max || 0)) return;
+            const count = Number(V.tentacles?.max);
+            if (!Number.isInteger(count) || count < 1) return;
 
             const container = document.createElement('div');
             container.className = 'ce-enemy-state ce-tentacle-state';
 
-            for (let i = 0; i < V.tentacles.max; i++) {
+            for (let i = 0; i < count; i++) {
                 const tentacle = V.tentacles[i];
 
                 if (!tentacle) continue;
@@ -436,18 +442,12 @@
 
                 const value = Math.max(
                     0,
-                    Math.round(Number(tentacle.tentaclehealth || 0))
+                    rounded(tentacle.tentaclehealth || 0)
                 );
 
                 const max = Math.max(
                     1,
-                    Math.round(
-                        Number(
-                            tentacle.tentaclehealthstart ??
-                            tentacle.tentaclehealth ??
-                            15
-                        )
-                    )
+                    rounded(tentacle.tentaclehealthstart ?? tentacle.tentaclehealth ?? 15, 15)
                 );
 
                 const percent = Math.min(
@@ -506,45 +506,6 @@
         }
     });
     
-    // 判斷是否戰鬥中
-    function CE_HasAnyCombatBarTarget() {
-        const hasHuman =
-            Array.isArray(V.NPCList) &&
-            V.NPCList.some(npc =>
-                npc &&
-                npc.health != null &&
-                npc.stance !== 'defeated'
-            );
-
-        const hasTentacle =
-            V.tentacles &&
-            Number(V.tentacles.active || 0) > 0;
-
-        return hasHuman || hasTentacle;
-    }
-    
-    setup.CE_StateBarInitialized ??= false;
-    setup.CE_HadCombatBarTarget ??= false;
-
-    $(document).on(':passagestart', () => {
-        const hasTarget = CE_HasAnyCombatBarTarget();
-
-        // 上一輪有目標，這一輪沒有目標 = 戰鬥血條結束
-        if (setup.CE_HadCombatBarTarget && !hasTarget) {
-            setup.CE_StateBarInitialized = false;
-            
-            Object.keys(lastPercents).forEach(key => {
-                delete lastPercents[key];
-            });
-        }
-
-        setup.CE_HadCombatBarTarget = hasTarget;
-    });
-
-})();
-
-(function () {
-
     // ================================
     // 在第 3 個 div 開頭插入 CE 容器（支援多個 slot）
     // ================================
@@ -569,6 +530,7 @@
         container.appendChild(slot);
 
         targetDiv.insertBefore(container, targetDiv.firstChild);
+        containers.add(container);
 
         console.log(`[cheat Extended][EnemyStateBar] 容器已插入 id=${slotId}`);
         return slot;
@@ -577,18 +539,18 @@
     // ================================
     // passage 顯示後執行
     // ================================
-    $(document).on(':passagedisplay', () => {
-        if (V.combat !== 1) return;
-        if (V.stalk === true) return;
-        if (!V.CE_EnemyStateEnable) return;
+    function render() {
+        if (!active) return;
+        clearView();
+        if (!shouldDisplay()) { resetAnimation(); return; }
 
         // 開始堆疊widget，最後插入的會顯示在最上面
 
         // 第二個 widget（NPC血條，僅在 NPCList.length > 1）
-        const validNPCs = V.NPCList.filter(npc =>
-            npc.health !== undefined &&
-            npc.health !== null
-        );
+        const validNPCs = Array.isArray(V.NPCList) ? V.NPCList.filter(npc => npc && npc.health != null) : [];
+        const hasHuman = validNPCs.length > 0;
+        const hasTentacle = Number(V.tentacles?.active || 0) > 0;
+        if (!hasHuman && !hasTentacle) { resetAnimation(); return; }
 
         if (validNPCs.length > 1) {
             const slotNPC = insertCEContainerAtThirdDiv('CE_EnemyState_Slot_NPC');
@@ -603,17 +565,6 @@
             insertCEContainerAtThirdDiv('CE_EnemyState_Slot_Global');
 
         if (slotGlobal) {
-            const hasHuman =
-                Array.isArray(V.NPCList) &&
-                V.NPCList.some(npc =>
-                    npc &&
-                    npc.health != null
-                );
-
-            const hasTentacle =
-                V.tentacles &&
-                Number(V.tentacles.active || 0) > 0;
-
             if (hasHuman) {
                 new Wikifier(slotGlobal, '<<CE_EnemyState>>');
             }
@@ -623,8 +574,36 @@
             }
         }
         
-        setup.CE_StateBarInitialized = true;
-        
-    });        
-
+        setup.CE_StateBarInitialized = containers.size > 0;
+        setup.CE_HadCombatBarTarget = containers.size > 0;
+    }
+    function onStart() {
+        if (!active) return;
+        clearView();
+        if (!shouldDisplay()) resetAnimation();
+    }
+    function onLoad() {
+        if (!active) return;
+        clearView();
+        resetAnimation();
+    }
+    setup.CE_enemyState = { refresh: render };
+    setup.CE_features.register('enemy-state-display', () => {
+        active = true;
+        resetAnimation();
+        Save.onLoad.add(onLoad);
+        $(document).on(':passagestart', onStart);
+        $(document).on(':passagedisplay', render);
+        return () => {
+            active = false;
+            clearView();
+            resetAnimation();
+            try { Save.onLoad.delete(onLoad); }
+            finally {
+                $(document).off(':passagestart', onStart);
+                $(document).off(':passagedisplay', render);
+            }
+        };
+    });
+    setup.CE_features.enable('enemy-state-display');
 })();

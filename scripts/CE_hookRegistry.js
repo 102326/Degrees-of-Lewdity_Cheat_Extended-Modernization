@@ -30,10 +30,16 @@ window.CE_createHookRegistry = function () {
 
     function select(path) {
         const owners = paths.get(path);
-        let selected = owners?.get("legacy")?.config;
+        let selected;
+        let baseRank = -1;
         let winner;
         for (const [owner, { config, rank }] of owners ?? []) {
-            if (owner !== "legacy" && (!winner ||
+            if (owner === "legacy" || config.base) {
+                if (rank.sequence > baseRank) { selected = config; baseRank = rank.sequence; }
+            }
+        }
+        for (const [owner, { config, rank }] of owners ?? []) {
+            if (owner !== "legacy" && !config.base && (!winner ||
                 rank.explicit > winner.explicit ||
                 (rank.explicit === winner.explicit && rank.sequence > winner.sequence))) {
                 selected = config;
@@ -49,6 +55,9 @@ window.CE_createHookRegistry = function () {
 
     return {
         current,
+        pathsForOwner(owner) {
+            return [...paths].filter(([, owners]) => owners.has(owner)).map(([path]) => path);
+        },
         register(path, config, owner = "legacy", preserveOrder = false) {
             const owners = paths.get(path) ?? new Map();
             const identity = JSON.stringify([path, owner, config.orderKey ?? ""]);
