@@ -4,7 +4,7 @@
     "cn": "作弊拓展",
     "en": "Cheat Expansion"
   },
-  "version": "1.20.3.1-rebuild.29",
+  "version": "1.20.3.1-rebuild.30",
   "styleFileList": [
     "css/CE_CSS.css",
     "css/CE_EnemyStateCss.css",
@@ -278,7 +278,7 @@
           {
             "TODO": "function=>hook money",
             "from": "DefineMacro(\"money\", money);",
-            "to": "if (!money.CE_moneyBoundary) {\n        const CE_nativeMoney = money;\n        money = function money(...args) {\n            const dispatch = window.CE_moneyTransaction;\n            return typeof dispatch === \"function\"\n                ? dispatch(CE_nativeMoney, this, args)\n                : CE_nativeMoney.apply(this, args);\n        };\n        Object.defineProperty(money, \"CE_moneyBoundary\", { value: true });\n    }\n    window.money = money;\n    DefineMacro(\"money\", money);",
+            "to": "if (!money.CE_moneyBoundary) {\n        const CE_nativeMoney = money;\n        money = function money(...args) {\n            const dispatch = window.CE_moneyTransaction;\n            return typeof dispatch === \"function\"\n                ? dispatch(CE_nativeMoney, this, args)\n                : CE_nativeMoney.apply(this, args);\n        };\n        Object.defineProperty(money, \"CE_macroMoney\", { value: function (...args) {\n            const dispatch = window.CE_moneyTransaction;\n            return typeof dispatch === \"function\"\n                ? dispatch(CE_nativeMoney, this, args, true)\n                : CE_nativeMoney.apply(this, args);\n        } });\n        Object.defineProperty(money, \"CE_moneyBoundary\", { value: true });\n    }\n    window.money = money;\n    DefineMacro(\"money\", money.CE_macroMoney);",
             "fileName": "stat-changes.js"
           },
           {

@@ -2,13 +2,19 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
-import { host, enabledState } from './hooks-host.mjs';
+import { execFileSync } from 'node:child_process';
+import { host, enabledState, baseline } from './hooks-host.mjs';
 
 const boot=JSON.parse(readFileSync('boot.json','utf8'));
 const moneyPatch=boot.addonPlugin.find(a=>a.modName==='ReplacePatcher').params.js.find(p=>p.TODO==='function=>hook money');
 function moneyHost({exported=true,patchCopies=1}={}) {
   const h=host(),{c,macroRegistry}=h;
   const loads=new Set(),events=new Map(),writes=[];
+  c.Wikifier={wikifyEval(text){
+    const match=/^<<money ([\d.eE+-]+) unknown>>$/.exec(text);
+    if(!match)throw Error('Only reviewed money Macro syntax is supported');
+    return macroRegistry.get('money').handler.call({args:[Number(match[1]),'unknown']});
+  }};
   c.Save={onLoad:{add:fn=>loads.add(fn),delete:fn=>loads.delete(fn)}};
   c.SugarCube=exported?{Save:c.Save}:{};
   c.nativeMoney=function(amount,source,optional={}) {
@@ -35,6 +41,104 @@ function moneyHost({exported=true,patchCopies=1}={}) {
     c.State.variables=state(money);h.emit(':passagestart');
   }};
 }
+
+// This Git blob is byte-identical to the author's 1.20.3.1 release script.
+const legacySource=execFileSync('git',['show',`${baseline}:scripts/CE_MoneyCheat.js`],{encoding:'utf8'});
+function legacyMoneyHost() {
+  const h=moneyHost();h.c.money=h.c.nativeMoney;h.c.V.CE_moneyWatchEnabled=false;
+  const start=legacySource.indexOf('macro.handler = function()');
+  const end=legacySource.indexOf('console.log("[Cheat Extended] ✅ Money macro handler',start);
+  const camel=legacySource.match(/const toCamelCaseLocal = str =>[\s\S]+?;\s/)[0];
+  vm.runInContext(`(()=>{const macro=Macro.get('money');${camel}\n${legacySource.slice(start,end)}})()`,h.c);
+  return h;
+}
+
+function legacyWatchHost() {
+  const h=legacyMoneyHost();h.c.V.CE_moneyWatchEnabled=true;
+  h.c.modUtils={getLogger:()=>h.c.console,getMod:name=>name==='maplebirch'?{}:undefined};
+  h.c.maplebirch={dynamic:{regTimeEvent:(type,name,event)=>h.events.set(name,event.action)}};
+  const start=legacySource.lastIndexOf('(function ()',legacySource.indexOf('window.CE_moneyWatch = function'));
+  const end=legacySource.indexOf('registerMoneyWatchEvent();')+'registerMoneyWatchEvent();'.length;
+  vm.runInContext(legacySource.slice(start,end),h.c);
+  return h;
+}
+
+for(const [name,run] of [
+  ['raw income',h=>{h.c.V.money+=10;}],['raw expense',h=>{h.c.V.money-=10;}],
+  ['opposing raw writes',h=>{h.c.V.money+=100;h.c.V.money-=80;}],
+  ['raw and Macro mixed',h=>{h.c.V.money+=100;h.macroRegistry.get('money').handler.call({args:[10,'known']});h.c.V.money-=80;}],
+  ['multipliers off',h=>{h.c.V.CE_moneyCheat=false;h.c.V.money+=10;}],
+])test(`author Watch parity: ${name}`,()=>{
+  const old=legacyWatchHost(),current=moneyHost();
+  for(const h of [old,current]){h.tick();run(h);h.tick();h.tick();}
+  assert.equal(current.c.V.money,old.c.V.money);
+  assert.deepEqual({...current.c.V.moneyStats},{...old.c.V.moneyStats});
+  assert.equal(current.writes.length,old.writes.length);
+});
+
+test('intentional legacy exception: native direct calls are not booked twice',()=>{
+  const old=legacyWatchHost(),current=moneyHost();
+  for(const h of [old,current]){h.tick();h.c.money(10,'native');h.tick();}
+  assert.equal(old.c.V.money,120);assert.equal(current.c.V.money,120);
+  assert.equal(old.c.V.moneyStats.earned,30);assert.equal(old.writes.length,2);
+  assert.equal(current.c.V.moneyStats.earned,20);assert.equal(current.writes.length,1);
+});
+
+test('intentional legacy exception: recordOnly does not invent a raw expense and extra balance',()=>{
+  const old=legacyWatchHost(),current=moneyHost();
+  for(const h of [old,current]){h.tick();h.macroRegistry.get('money').handler.call({args:[10,'record',{recordOnly:true}]});h.tick();}
+  assert.equal(old.c.V.money,110);assert.equal(old.writes.length,2);
+  assert.equal(current.c.V.money,100);assert.equal(current.writes.length,1);
+  assert.equal(current.c.V.moneyStats.earned,20);assert.equal(current.c.V.moneyStats.spent,0);
+});
+
+for(const [name,input,options,source='source_name'] of [
+  ['income',10,undefined],['expense',-10,undefined],['numeric string','10',undefined],
+  ['boolean amount',true,undefined],['record-only income',10,{recordOnly:true}],
+  ['record-only expense',-10,{recordOnly:true}],['null options',10,null],['false options',10,false],
+  ['numeric source',10,undefined,17],['boxed source',10,undefined,new String('source_name')],
+])test(`author Macro parity: ${name}`,()=>{
+  const old=legacyMoneyHost(),current=moneyHost();current.c.V.CE_moneyWatchEnabled=false;
+  for(const h of [old,current])h.macroRegistry.get('money').handler.call({args:[input,source,options&&{...options}]});
+  assert.equal(current.c.V.money,old.c.V.money);
+  assert.deepEqual({...current.c.V.moneyStats},{...old.c.V.moneyStats});
+  assert.equal(current.writes[0]?.amount,old.writes[0]?.amount);
+  assert.equal(current.writes[0]?.source,old.writes[0]?.source);
+  assert.equal(typeof current.writes[0]?.optional,typeof old.writes[0]?.optional);
+});
+
+test('raw routing goes through the existing controlled Macro including third-party wrappers',()=>{
+  const h=moneyHost();h.tick();let calls=0;
+  const macro=h.macroRegistry.get('money'),previous=macro.handler;
+  const wrapper=function(){calls++;return previous.apply(this,arguments);};macro.handler=wrapper;
+  h.c.V.money+=10;h.tick();h.tick();
+  assert.equal(calls,1);assert.equal(h.c.V.money,120);assert.equal(h.c.V.moneyStats.earned,20);
+  h.c.setup.CE_features.disable('money');assert.equal(macro.handler,wrapper);
+});
+
+test('controlled Macro failure after native bookkeeping pauses without repeating side effects',()=>{
+  const h=moneyHost();h.tick();const macro=h.macroRegistry.get('money'),previous=macro.handler;
+  macro.handler=function(){previous.apply(this,arguments);throw Error('Macro wrapper after stats');};
+  h.c.V.money+=10;h.tick();h.tick();
+  assert.equal(h.c.V.money,120);assert.equal(h.c.V.moneyStats.earned,20);assert.equal(h.writes.length,1);
+  assert.equal(h.c.CE_moneyWatch.error,'Macro wrapper after stats');
+});
+
+test('author Macro numeric objects convert once; native return, option identity and legacy marker survive',()=>{
+  for(const create of [legacyMoneyHost,moneyHost]){
+    const h=create();let conversions=0;const input={valueOf(){conversions++;return 10;}};
+    const result=h.macroRegistry.get('money').handler.call({args:[input,'source_name']});
+    assert.equal(h.c.V.money,120);assert.equal(conversions,1);
+    if(create===moneyHost)assert.equal(result,'native-result');
+  }
+  const h=moneyHost(),options=Object.freeze({recordOnly:true});
+  h.macroRegistry.get('money').handler.call({args:[10,'frozen',options]});
+  assert.equal(h.c.V.money,100);assert.equal(h.c.V.moneyStats.earned,20);
+  assert.equal(Object.hasOwn(options,'_CE_macroTriggered'),false);
+  const mutable={recordOnly:true};
+  h.macroRegistry.get('money').handler.call({args:[10,'mutable',mutable]});
+  assert.equal(h.writes.at(-1).optional,mutable);assert.equal(mutable._CE_macroTriggered,true);
+});
 
 test('native load resets Money observation without replaying another save balance',()=>{
   const h=moneyHost();h.tick();h.load(1000);h.tick();
@@ -178,10 +282,12 @@ test('Money cleanup removes only its bridge and observers, preserving the native
   macro.call({args:[10,'native']});assert.equal(h.c.V.money,140);
 });
 
-test('native recordOnly retains the original amount and never creates a second transaction',()=>{
+test('Macro recordOnly scales like the author; direct native recordOnly remains native and neither replays',()=>{
   const h=moneyHost();h.tick();
   h.macroRegistry.get('money').handler.call({args:[10,'record',{recordOnly:true}]});h.tick();
-  assert.equal(h.c.V.money,100);assert.equal(h.writes.length,1);assert.equal(h.writes[0].amount,10);
+  assert.equal(h.c.V.money,100);assert.equal(h.writes.length,1);assert.equal(h.writes[0].amount,20);
+  h.c.money(10,'native-record',{recordOnly:true});h.tick();
+  assert.equal(h.c.V.money,100);assert.equal(h.writes.length,2);assert.equal(h.writes[1].amount,10);
 });
 
 test('Money starts before SugarCube window exports and repeated Patch application cannot multiply twice',()=>{

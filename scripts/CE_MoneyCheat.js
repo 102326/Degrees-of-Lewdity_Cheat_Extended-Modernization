@@ -31,26 +31,35 @@ setup.CE_features.register('money', () => {
     observe.reset = reset;
     Object.defineProperty(observe, 'error', { get: () => fault });
 
-    function dispatch(original, receiver, args) {
+    function dispatch(original, receiver, args, fromMacro = false) {
         if (!active || window.CE_moneyTransaction !== dispatch) return original.apply(receiver, args);
         const state = context();
         const before = state.money;
         const outermost = depth === 0;
+        if (outermost && fromMacro) {
+            // The author's Macro normalized these inputs before calling native money.
+            args = [...args];
+            args[0] = Number(args[0]);
+            args[2] = args[2] || {};
+            if (typeof args[2] === 'object' || typeof args[2] === 'function') {
+                Reflect.set(args[2], '_CE_macroTriggered', true);
+            }
+        }
         if (outermost && V.CE_moneyCheat) {
             const [input, source, optional] = args;
             const amount = typeof input === 'number' || typeof input === 'string' ? Number(input) : NaN;
             const validSource = source === undefined || typeof source === 'string' || source instanceof String;
             const validOptions = optional === undefined || optional !== null && typeof optional === 'object';
             // Accessor/inherited flags remain entirely native: do not execute their getters twice.
-            const flag = validOptions && optional && Object.getOwnPropertyDescriptor(optional, 'recordOnly');
-            const ordinaryTransaction = optional === undefined || validOptions &&
+            const flag = !fromMacro && validOptions && optional && Object.getOwnPropertyDescriptor(optional, 'recordOnly');
+            const ordinaryTransaction = fromMacro || optional === undefined || validOptions &&
                 (!('recordOnly' in optional) || flag && 'value' in flag && !flag.value);
-            if (Number.isFinite(amount) && validSource && ordinaryTransaction) {
+            if (Number.isFinite(amount) && (fromMacro || validSource) && ordinaryTransaction) {
                 const factor = amount > 0 ? V.CE_moneyInMultiplier : V.CE_moneyOutMultiplier;
                 if (Number.isFinite(factor) && (amount > 0 && factor > 1 || amount < 0 && factor >= 0 && factor < 1)) {
                     args = [...args];
                     args[0] = amount * factor;
-                    if (typeof source === 'string' && source) {
+                    if (source && (fromMacro || typeof source === 'string')) {
                         args[1] = (source + '_modifiedByCE')
                             .replace(/[_\s]+(.)?/g, (_, c) => c ? c.toUpperCase() : '')
                             .replace(/^(.)/, c => c.toLowerCase());
@@ -86,8 +95,9 @@ setup.CE_features.register('money', () => {
         if (unexplained !== 0) {
             settling = true;
             try {
-                if (window.CE_moneyTransaction !== dispatch || typeof window.money !== 'function') {
-                    throw new Error('Native money bridge unavailable or replaced');
+                if (window.CE_moneyTransaction !== dispatch || typeof Macro.get('money')?.handler !== 'function' ||
+                    typeof Wikifier === 'undefined' || typeof Wikifier.wikifyEval !== 'function') {
+                    throw new Error('Controlled money Macro unavailable or bridge replaced');
                 }
                 const restored = state.money - unexplained;
                 state.money = restored;
@@ -96,7 +106,7 @@ setup.CE_features.register('money', () => {
                 }
                 if (state.money !== restored) throw new Error('Money Hook rejected reconstruction');
                 // Native execution (including nested wrappers) is one accounted boundary.
-                window.money(unexplained, 'unknown');
+                Wikifier.wikifyEval(`<<money ${unexplained} unknown>>`);
                 if (!Number.isFinite(state.money)) throw new Error('Native routing left a non-finite balance');
             } catch (error) {
                 if (State.variables === state && !fault) fail(error);

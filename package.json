@@ -1,6 +1,6 @@
 {
   "name": "ce-modernization",
-  "version": "1.20.3.1-rebuild.29",
+  "version": "1.20.3.1-rebuild.30",
   "private": true,
   "type": "module",
   "engines": { "node": ">=22.12.0" },
