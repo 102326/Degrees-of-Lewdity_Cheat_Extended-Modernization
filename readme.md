@@ -64,7 +64,7 @@ Windows 结果覆盖 Chrome 浏览器宿主，未验收 Windows 封装 App 或 C
 
 - 原 Mod 作者：[chris81605](https://github.com/chris81605)。重制基于原版 `1.20.3.1` 的固定提交 [`c36b23a`](https://github.com/chris81605/Degrees-of-Lewdity_Cheat_Extended/tree/c36b23a6ab1899c7f780faa63945fe6e199a6355)。
 - 重制维护：[102326](https://github.com/102326)。本项目为独立衍生维护，不代表原作者正式发行或背书；保留隨風飄逸及其它贡献者署名。
-- 沿用 [CC BY-NC-SA 4.0](LICENSE.txt)，Spectrum、OpenCC 等第三方代码保留各自许可与通知，见[修改与署名说明](R1-NOTICE.md)。
+- 沿用 [CC BY-NC-SA 4.0](LICENSE.txt)，Spectrum、OpenCC 等第三方代码保留各自许可与通知，见[修改与署名说明](https://github.com/102326/Degrees-of-Lewdity_Cheat_Extended-Modernization/blob/v1.20.3.1-rebuild.28/R1-NOTICE.md)。
 - 游戏作者：Vrelnir。[博客][blog] · [游戏源码][gitgud] · [英文维基][wiki-en] · [中文维基][wiki-cn] · [Discord][discord]。
 
 <details>
