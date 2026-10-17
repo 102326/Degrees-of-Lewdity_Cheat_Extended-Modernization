@@ -166,11 +166,12 @@ Macro.add("brothelBasementManager", {
         root.appendChild(body);
         this.output.append(root);
         //updateDisplay(); 
-        setTimeout(updateDisplay, 10);
+        const state = V;
+        setTimeout(() => { if (V === state && root.isConnected) updateDisplay(); }, 10);
     }
 });
 
-registerCE_genericTimeEvent(
+registerCE_timeFeature('basement-rewards', [[
     'onDay',
     'CE_尋歡洞報酬基礎值更新',
     () => {
@@ -188,4 +189,4 @@ registerCE_genericTimeEvent(
         V.brothel_basement_price_base = V.brothel_basement_price;
         V.brothel_basement_price = V.brothel_basement_price_base * V.brothel_basement_multiplier;
     }
-);
+]]);

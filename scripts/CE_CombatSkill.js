@@ -411,11 +411,11 @@ setup.myModCombatSkill.once.reset = function () {
     V.myModCombatSkillOnceUsed = {};
 };
 
-$(document).on(':passagestart', function () {
-    if (T.combatend) {
-        setup.myModCombatSkill.once.reset();
-    }
-});
+function CE_resetCombatOnce() {
+    if (T.combatend) setup.myModCombatSkill.once.reset();
+}
+// Boundary bookkeeping remains passive while skill effects are disabled.
+$(document).on(':passagedisplay', CE_resetCombatOnce);
 
 // 擊敗處理鏈
 // 記錄本次技能造成擊敗的 NPC index
@@ -763,6 +763,7 @@ setup.myModCombatSkill.modEnemyStat = function (
                     actionType: [type],
 
                     cond: () => {
+                        if (!setup.CE_features.isEnabled('combat-skills')) return false;
                         // 預設(Default)技能僅在人類戰鬥中顯示
                         // 若目前不是人類戰（如觸手、吞噬、機械等特殊戰鬥）
                         // 則直接隱藏此技能按鈕
@@ -818,6 +819,7 @@ setup.myModCombatSkill.modEnemyStat = function (
      *   :passagestart
      */
     function processSkills() {
+        if (V.combat !== 1) return;
         setup.myModCombatSkill.list.forEach(skill => {
 
             const actionTypeMap = {
@@ -955,13 +957,24 @@ setup.myModCombatSkill.modEnemyStat = function (
         setup.myModCombatSkill.messageQueue = [];
     }
 
-    $(document).on(':passagestart', function () {        
-        processSkills();
+    setup.CE_features.register('combat-skills', () => {
+        const clearTransient = () => {
+            setup.myModCombatSkill.messageQueue = [];
+            setup.myModCombatSkill.defeatQueue = [];
+            setup.myModCombatSkill.defeatDamageMap = {};
+            document.getElementById('myModCombatSkillMessageSlot')?.closest('.my-mod-combat-skill-message-container')?.remove();
+        };
+        Save.onLoad.add(clearTransient);
+        $(document).on(':passagestart', processSkills);
+        $(document).on(':passagedisplay', displayMessages);
+        return () => {
+            $(document).off(':passagestart', processSkills);
+            $(document).off(':passagedisplay', displayMessages);
+            Save.onLoad.delete(clearTransient);
+            clearTransient();
+        };
     });
-
-    $(document).on(':passagedisplay', function () {
-        displayMessages();
-    });
+    setup.CE_features.enable('combat-skills');
 
 })();
 

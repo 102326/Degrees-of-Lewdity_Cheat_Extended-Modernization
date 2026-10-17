@@ -3,31 +3,11 @@
    ========================= */
 
 function refreshHairSidebar(useFullRedraw = false, delay = 50) {
-    setTimeout(() => {
-        try {
-            if (useFullRedraw) {
-                Renderer.lastAnimation.stop();
-                Renderer.animateLayersAgain();
-            } else {
-                Renderer.lastAnimation.invalidateCaches();
-                Renderer.lastAnimation.redraw();
-            }
-            Wikifier.wikifyEval('<<updatesidebarimg true>>');
-        } catch (e) {
-            console.warn('[cheat extended][HairCustom] refresh', e);
-        }
-    }, delay);
+    setup.CE_appearanceRendering.refresh(useFullRedraw, delay);
 }
 
 function pushCustomHairToSetup() {
-    if (!Array.isArray(V.customHair) || !setup.colours || !Array.isArray(setup.colours.hair)) return;
-    V.customHair.forEach(hair => {
-        const idx = setup.colours.hair.findIndex(item => item.variable === hair.variable);
-        if (idx === -1) setup.colours.hair.push({...hair});
-        else setup.colours.hair[idx] = {...hair};
-    });
-    setup.colours.hair_map = {};
-    buildColourMap('hair');
+    setup.CE_customColours.project('hair', Array.isArray(V.customHair) ? V.customHair : []);
 }
 
 function setPlayerHairColour(variable, which = 'hair') {
@@ -43,27 +23,6 @@ function setPlayerHairColour(variable, which = 'hair') {
     }
     refreshHairSidebar();
 }
-
-function checkCHC() {
-    console.log('[cheat extended][HairCustom] 🧾 正在執行髮色資料檢查……');
-    setup.hairCustomInit = true;
-}
-
-Save.onLoad.add(checkCHC);
-
-$(document).one(':passageinit', () => {
-    if (Array.isArray(V.customHair) && V.customHair.length) checkCHC();
-});
-
-$(document).on(':passagedisplay', () => {
-    if (!setup.hairCustomInit) return;
-    if (Array.isArray(V.customHair)) {
-        console.log('[cheat extended][HairCustom] 🔹 初始化自訂髮色...');
-        pushCustomHairToSetup();
-        delete setup.hairCustomInit;
-    }
-});
-
 
 /* =========================
    私處毛染色模式覆寫
@@ -92,12 +51,13 @@ const RenderingStepCEPbHairColor = {
     name: 'cePbHairColor',
 
     condition(layer) {
-        return V.CE_pbhairBlendMode &&
+        return setup.CE_features.isEnabled('pubic-hair-rendering') && V.CE_pbhairBlendMode &&
             V.CE_pbhairBlendMode !== 'native' &&
             layer.filters?.includes('pbhair');
     },
 
     render(image, layer) {
+        if (!setup.CE_features.isEnabled('pubic-hair-rendering')) return image;
         const colourKey =
             V.makeup?.pbcolour != 0
                 ? V.makeup.pbcolour
@@ -119,10 +79,32 @@ const RenderingStepCEPbHairColor = {
     }
 };
 
-Renderer.RenderingPipeline = Renderer.RenderingPipeline.filter(
-    step => step.name !== 'cePbHairColor'
-);
-Renderer.RenderingPipeline.push(RenderingStepCEPbHairColor);
+setup.CE_features.register('pubic-hair-rendering', () => {
+    let active = true, installed;
+    function sync() {
+        if (!active) return;
+        const pipeline = Renderer.RenderingPipeline;
+        if (!Array.isArray(pipeline)) throw new Error('[Cheat Extended] Missing native rendering pipeline');
+        if (installed && installed !== pipeline) {
+            const index = installed.indexOf(RenderingStepCEPbHairColor);
+            if (index !== -1) installed.splice(index, 1);
+        }
+        if (!pipeline.includes(RenderingStepCEPbHairColor)) pipeline.push(RenderingStepCEPbHairColor);
+        installed = pipeline;
+    }
+    $(document).on(':passagestart', sync);
+    sync();
+    return () => {
+        active = false;
+        $(document).off(':passagestart', sync);
+        for (const pipeline of new Set([installed, Renderer.RenderingPipeline])) {
+            if (!Array.isArray(pipeline)) continue;
+            const index = pipeline.indexOf(RenderingStepCEPbHairColor);
+            if (index !== -1) pipeline.splice(index, 1);
+        }
+    };
+});
+setup.CE_features.enable('pubic-hair-rendering');
 
 Macro.add('hairCustomManager', {
     handler() {
@@ -271,9 +253,7 @@ Macro.add('hairCustomManager', {
                     if (V.makeup.pbcolour === removed.variable) V.makeup.pbcolour = 0;
                     if (V.hairColourGradient?.colours) V.hairColourGradient.colours = V.hairColourGradient.colours.map(c => c === removed.variable ? fallback : c);
                     if (V.hairFringeColourGradient?.colours) V.hairFringeColourGradient.colours = V.hairFringeColourGradient.colours.map(c => c === removed.variable ? fallback : c);
-                    setup.colours.hair = setup.colours.hair.filter(item => item.variable !== removed.variable);
-                    setup.colours.hair_map = {};
-                    buildColourMap('hair');
+                    pushCustomHairToSetup();
                     refreshHairSidebar();
                     render();
                 };

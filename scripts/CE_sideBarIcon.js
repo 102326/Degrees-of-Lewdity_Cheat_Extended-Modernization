@@ -1,25 +1,14 @@
 // 右側折疊狀態欄的 CE 入口。
 // 點擊後以 CE overlay 顯示作弊拓展主選單。
 function CEiconClicked() {
+    if (!setup.CE_features.isEnabled('ce-menu')) return false;
     $.wiki("<<CEoverlayReplace \"CEcheatMenu\">>");
 }
 window.CEiconClicked = CEiconClicked;
 
-// 偵測 Simple Frameworks。
-// 僅記錄相容旗標；實際圖示插入方式由對應框架端處理。
-function CEiconSFdetect(){    
-    const simpleMod = (window.modUtils.getModListNameNoAlias().includes('Simple Frameworks') ? window.modUtils.getAnyModByNameNoAlias('Simple Frameworks') : undefined); // ⚡ Simple Frameworks
-    const logger = window.modUtils.getLogger();
-    //logger.warn(`[cheat Extended][CEiconSFdetect] 🧾 simpleMod = ${simpleMod}`);
-    //console.warn(`[cheat Extended][CEiconSFdetect] 🧾 simpleMod = ${simpleMod}`);
-    if (simpleMod) V.CE_SFflag = true;
-    //logger.warn(`[cheat Extended][CEiconSFdetect] 🧾 V.CE_SFflag = ${V.CE_SFflag}`);
-    //console.warn(`[cheat Extended][CEiconSFdetect] 🧾 V.CE_SFflag = ${V.CE_SFflag}`);
-}
-CEiconSFdetect();
-
 // 用於CE主畫面顯示的安全渲染函數，避免容器不存在的情況仍然渲染導致錯誤
 function CE_renderSettings(wikiText) {
+    if (!setup.CE_features.isEnabled('ce-menu')) return false;
     const target = document.getElementById('CE_settingsDiv') || window.CE_activeSettingsDiv;
     if (!target) {
         console.warn('[Cheat Extended] #CE_settingsDiv not found, skip render:', wikiText);
@@ -357,9 +346,42 @@ Macro.add('CE_CheatExtendedVersion', {
 
     // CE_TabManager：集中管理一級分類與二級功能 tab。
     const CE_TabManager = {
+        _active: false,
+        _epoch: 0,
+        _frames: new Set(),
+        frame(callback, node) {
+            if (!this._active) return;
+            const epoch = this._epoch, state = V;
+            const id = requestAnimationFrame(() => {
+                this._frames.delete(id);
+                if (this._active && this._epoch === epoch && V === state && node?.isConnected) callback();
+            });
+            this._frames.add(id);
+        },
+        releaseView() {
+            this._epoch++;
+            for (const id of this._frames) cancelAnimationFrame(id);
+            this._frames.clear();
+            this._marqueeObserver?.disconnect();
+            this._marqueeObserver = null;
+            this._container = this._categoryBar = this._tabBar = this._renderCategoryTabs = null;
+            this._btnMap = {};
+            this.releaseSortUI();
+        },
+        releaseSortUI() {
+            const wrap = this._sortWrap, body = this._sortBody;
+            this._sortWrap = this._sortBody = null;
+            if (!wrap) return;
+            try {
+                // Only our sole content still occupying the recorded native body owns this Dialog.
+                if (wrap.parentNode === body && body === Dialog.body() &&
+                    body.childElementCount === 1 && body.firstElementChild === wrap && Dialog.isOpen()) Dialog.close();
+            } finally { wrap.remove(); }
+        },
         tabs: [],           // 存放所有已註冊的 tab 物件
         _btnMap: {},        // tabId → button DOM 映射，用於 restore 上次選中 tab
         _sortWrap: null,    // 排序 UI 容器 DOM
+        _sortBody: null,
         _defaultOrder: null,// 預設 tab 註冊順序（用於還原）
         _activeCategory: null,
         _categoryBar: null,
@@ -538,6 +560,8 @@ Macro.add('CE_CheatExtendedVersion', {
          * 「標籤頁管理」固定附加在一級分類列末端，不參與一般 tab 排序。
          */
         render(container) {
+            if (!this._active || !container?.isConnected) return;
+            this.releaseView();
             ensureGlobalTabConfig();
             this.applyOrder();
             container.innerHTML = '';
@@ -568,11 +592,11 @@ Macro.add('CE_CheatExtendedVersion', {
 
             // 固定 Tab 寬度，僅讓超出範圍的文字在按鈕內左右滾動。
             // 重新建立 Tab 列表前，先中斷先前的觀察器。
-            this._marqueeObserver?.disconnect();
+            const viewEpoch = this._epoch;
             const marqueeObserver = typeof ResizeObserver === 'function'
                 ? new ResizeObserver(entries => {
                     entries.forEach(({ target }) => {
-                        if (target.isConnected) updateMarquee(target);
+                        if (this._active && this._epoch === viewEpoch && target.isConnected) updateMarquee(target);
                     });
                 })
                 : null;
@@ -593,7 +617,7 @@ Macro.add('CE_CheatExtendedVersion', {
                 }
             }
 
-            function setTabLabel(button, value) {
+            const setTabLabel = (button, value) => {
                 button.title = value;
                 const viewport = document.createElement('span');
                 viewport.className = 'CE-tab-label-viewport';
@@ -603,10 +627,8 @@ Macro.add('CE_CheatExtendedVersion', {
                 viewport.appendChild(label);
                 button.appendChild(viewport);
                 marqueeObserver?.observe(button);
-                requestAnimationFrame(() => {
-                    if (button.isConnected) updateMarquee(button);
-                });
-            }
+                this.frame(() => updateMarquee(button), button);
+            };
 
             const categoryBar = document.createElement('div');
             categoryBar.className = 'CE-category-bar';
@@ -619,8 +641,8 @@ Macro.add('CE_CheatExtendedVersion', {
             const scrollSelectedIntoView = (categoryId, tabId) => {
                 // 等兩級標籤完成佈局後再捲動，避免剛進入選單時
                 // restore() 雖已選中項目，但瀏覽器尚未算出正確的水平位置。
-                requestAnimationFrame(() => {
-                    requestAnimationFrame(() => {
+                this.frame(() => {
+                    this.frame(() => {
                         const categoryBtn = categoryBar.querySelector(
                             `button[data-category-id="${categoryId}"]`
                         );
@@ -637,11 +659,12 @@ Macro.add('CE_CheatExtendedVersion', {
                             inline: 'center',
                             block: 'nearest'
                         });
-                    });
-                });
+                    }, container);
+                }, container);
             };
 
             const selectTab = (tab, categoryId) => {
+                if (!this._active || this._container !== container || !container.isConnected) return;
                 tabBar.querySelectorAll('button').forEach(btn => btn.classList.remove(selectedClass));
                 const btn = this._btnMap[tab.id];
                 if (btn) btn.classList.add(selectedClass);
@@ -656,6 +679,7 @@ Macro.add('CE_CheatExtendedVersion', {
             };
 
             const renderTabs = (categoryId, restoreTab = true) => {
+                if (!this._active || this._container !== container || !container.isConnected) return;
                 this._activeCategory = categoryId;
                 V.CE_LastCategory = categoryId;
                 this._btnMap = {};
@@ -735,31 +759,13 @@ Macro.add('CE_CheatExtendedVersion', {
          * 另提供還原預設排序，以及還原內建分類名稱 / tab 歸屬。
          */
         openSortUI() {
+            if (!this._active) return;
+            const state = V;
             ensureGlobalTabConfig();
-            if (this._sortWrap) {
-                Dialog.close();
-                this._sortWrap = null;
-            }
+            this.releaseSortUI();
 
             Dialog.setup('⚙️標籤頁管理');
             Dialog.wiki('');
-
-            /* === 修復0.5.7.8消失的 Dialog 關閉按鈕 === */
-            setTimeout(() => {
-                const btn = document.getElementById('ui-dialog-close');
-                if (!btn) return;
-
-                btn.textContent = '✖';
-                btn.style.display = 'inline-flex'; //block 
-                btn.style.alignItems = 'center';
-                btn.style.justifyContent = 'center';
-                btn.style.visibility = 'visible';
-                btn.style.opacity = '1';
-                btn.style.pointerEvents = 'auto';
-                btn.style.fontSize = '1rem';      // 可選
-                btn.style.lineHeight = '1';       // 可選
-            }, 0);
-            /* === 修復結束 === */
 
             const body = Dialog.body();
             const wrap = document.createElement('div');
@@ -768,6 +774,7 @@ Macro.add('CE_CheatExtendedVersion', {
             wrap.style.overflowY = 'auto';
             body.appendChild(wrap);
             this._sortWrap = wrap;
+            this._sortBody = body;
 
             // 初始化狀態表
             CE_GlobalTabConfig.CE_TabHidden = CE_GlobalTabConfig.CE_TabHidden || {};
@@ -1039,16 +1046,33 @@ Macro.add('CE_CheatExtendedVersion', {
 
             rerender();
 
-            Dialog.open(() => {
+            Dialog.open({}, () => {
+                const current = this._active && V === state && this._sortWrap === wrap;
                 saveGlobalTabConfig();
-                this._sortWrap = null;
-                if (this._container?.isConnected) {
+                if (this._sortWrap === wrap) this._sortWrap = this._sortBody = null;
+                if (current && this._container?.isConnected) {
                     this.render(this._container);
                     this.restore();
                 }
             });
         }
     };
+
+    setup.CE_features.register('ce-menu', () => {
+        CE_TabManager._active = true;
+        const release = () => CE_TabManager.releaseView();
+        const onClose = (_, name) => { if (name === 'CEcheatMenu') release(); };
+        $(document).on(':passagestart', release);
+        $(document).on(':oncloseoverlay', onClose);
+        Save.onLoad.add(release);
+        return () => {
+            CE_TabManager._active = false;
+            release();
+            try { Save.onLoad.delete(release); }
+            finally { $(document).off(':passagestart', release); $(document).off(':oncloseoverlay', onClose); }
+        };
+    });
+    setup.CE_features.enable('ce-menu');
 
     // TEST：控制台檢查目前 GlobalConfig。
     Object.defineProperty(window, 'CE_TabGlobalConfigDebug', {
@@ -1151,16 +1175,16 @@ Macro.add("title_cheatExtendedMenu", {
         // 由 CE_TabManager 生成分類列與功能 tab。
         if (window.CE_TabManager) {
             // 延後到下一幀，確保剛建立的容器已掛入 DOM。
-            requestAnimationFrame(() => {
+            CE_TabManager.frame(() => {
                 CE_TabManager.render(container); // 生成一級分類列與二級功能 tab
 
                 // render() 內部已建立按鈕、事件與選中狀態；再下一幀恢復上次位置。
-                requestAnimationFrame(() => {
+                CE_TabManager.frame(() => {
                     CE_TabManager.restore(); // 恢復最後選中的分類與功能 tab
-                });
+                }, container);
 
 
-            });
+            }, container);
         }
 
         // Overlay 使用 CE 自製關閉按鈕，避免依賴原版關閉按鈕行為。
@@ -1228,14 +1252,14 @@ Macro.add('cheat_extended', {
         this.output.appendChild(container);
 
         // 下一幀建立兩級標籤 UI，再恢復上次選中的分類與功能。
-        requestAnimationFrame(() => {
+        CE_TabManager.frame(() => {
             CE_TabManager.render(buttonBar);
 
             // render() 內部負責事件、選中樣式與水平捲動。
             CE_TabManager.restore();
 
 
-        });
+        }, buttonBar);
     }
 });
 
@@ -1649,6 +1673,7 @@ Macro.add('cheat_extended', {
             label: `<span class="red">禁用</span>狀態欄操作介面`,
             tooltip: "左側言靈集面板、左側快捷及空間節點功能勾選後將失去操作介面",
             tooltipClass: "red",
+            onChange() { setup.CE_sidebarVisibility.refresh(); },
         },
         {
             type: "checkbox",
@@ -1682,6 +1707,7 @@ Macro.add('cheat_extended', {
             label: "隱藏左側狀態開啟/關閉按鈕",
             tooltip: "注意，開啟後手機端只能用滑動的方式開啟左側狀態欄（因為按鈕不見了）",
             tooltipClass: "red",
+            onChange() { setup.CE_sidebarVisibility.refresh(); },
         },
         {
             type: "select",

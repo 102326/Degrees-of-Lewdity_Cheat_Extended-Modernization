@@ -49,79 +49,13 @@
  */
 
 (function(){
-    // ------------------- 通用 Hook 函數 -------------------
-    function hookMacro(macroName, {
-        cheatVar,          // V.CE_xxx 作弊開關
-        multiplierVar,     // V.CE_xxxMultiplier 正數倍率
-        negativeVar,       // V.CE_xxxNegativeMultiplier 負數倍率（可選）
-        modifyFunc,        // 自訂修改函數 (args) → 回傳新的 args
-        logFunc            // 自訂 log 函數 (macroName, oldArgs, newArgs)
-    }) {
-        const macro = Macro.get(macroName);
-        if (!macro) {
-            console.warn(`[Cheat Extended][macroHook] ⚠️ 找不到宏: ${macroName}`);
-            return;
-        }
-        
-        if (macro._CE_hooked) {
-            console.warn(`[Cheat Extended][macroHook] ⚠️ ${macroName}已hook。`);
-            return; // 已經hook過
-        }    
-        
-        macro._CE_hooked = true;
-
-        const originalHandler = macro.handler;
-
-        // 初始化作弊變數
-        if (typeof V[cheatVar] !== 'boolean') V[cheatVar] = false;
-        if (typeof V[multiplierVar] !== 'number') V[multiplierVar] = 1;
-        if (negativeVar && typeof V[negativeVar] !== 'number') V[negativeVar] = 1;
-
-        macro.handler = function(){
-            let args = Array.from(this.args);
-            const oldArgs = [...args];
-
-            if (V[cheatVar] && modifyFunc) {
-                args = modifyFunc(args);
-            }
-
-            // 覆寫回 this.args
-            for (let i = 0; i < args.length; i++) this.args[i] = args[i];
-
-            if (logFunc) logFunc(macroName, oldArgs, args);
-
-            
-            //return originalHandler.call(this);
-            const previousLock = setup.CE_macroLock;
-            setup.CE_macroLock = true;
-            try {
-                return originalHandler.call(this);
-            }
-            finally {
-                setup.CE_macroLock = previousLock;
-            }
-        };
-
-        console.log(`[Cheat Extended][macroHook] ✅ 宏 ${macroName} 已 Hook`);
-    }
-    
-    /* =====================================================
-    對外 API
-    ===================================================== */
-
-    window.CE_MacroHook = {
-        hookMacro
-    };   
-
-})();
-
-(function(){
 
     function registerMacroHooks(){
 
         // ------------------- Pain / Masopain -------------------
         ["pain", "masopain"].forEach(name => {
             CE_MacroHook.hookMacro(name, {
+                owner: "builtin:macro-status", base: true,
                 cheatVar: "CE_painCheat",
                 multiplierVar: "CE_painMultiplier",
                 negativeVar: "CE_painNegativeMultiplier",
@@ -148,6 +82,7 @@
         // ------------------- Trauma -------------------
         ["trauma", "combattrauma", "straighttrauma"].forEach(name => {
             CE_MacroHook.hookMacro(name, {
+                owner: "builtin:macro-status", base: true,
                 cheatVar: "CE_traumaCheat",
                 multiplierVar: "CE_traumaMultiplier",
                 negativeVar: "CE_traumaNegativeMultiplier",
@@ -170,6 +105,7 @@
         // ------------------- Control -------------------
         ["control", "combatcontrol"].forEach(name => {
             CE_MacroHook.hookMacro(name, {
+                owner: "builtin:macro-status", base: true,
                 cheatVar: "CE_controlCheat",
                 multiplierVar: "CE_controlMultiplier",
                 negativeVar: "CE_controlNegativeMultiplier",
@@ -191,6 +127,7 @@
 
         // ------------------- Stress -------------------
         CE_MacroHook.hookMacro("stress", {
+            owner: "builtin:macro-status", base: true,
             cheatVar: "CE_stressCheat",
             multiplierVar: "CE_stressMultiplier",
             negativeVar: "CE_stressNegativeMultiplier",
@@ -212,6 +149,7 @@
         // ------------------- Sensitivity -------------------
         ["breast", "mouth", "genital", "bottom"].forEach(key => {
             CE_MacroHook.hookMacro(key + "_sensitivity", {
+                owner: "builtin:macro-status", base: true,
                 cheatVar: "CE_sensCheat",
                 multiplierVar: "CE_sensMultiplier",
                 negativeVar: "CE_sensNegativeMultiplier",
@@ -234,6 +172,7 @@
         // ------------------- Arousal -------------------
         ["arousal", "breastarousal", "genitalarousal"].forEach(name => {
             CE_MacroHook.hookMacro(name, {
+                owner: "builtin:macro-status", base: true,
                 cheatVar: "CE_arousalCheat",
                 multiplierVar: "CE_arousalMultiplier",
                 negativeVar: "CE_arousalNegativeMultiplier",
@@ -255,6 +194,7 @@
 
         // ------------------- Tiredness -------------------
         CE_MacroHook.hookMacro("tiredness", {
+            owner: "builtin:macro-status", base: true,
             cheatVar: "CE_tiredCheat",
             multiplierVar: "CE_tiredMultiplier",
             negativeVar: "CE_tiredNegativeMultiplier",
@@ -280,6 +220,7 @@
             "beauty", "seductionskill", "skulduggery"
         ].forEach(name => {
             CE_MacroHook.hookMacro(name, {
+                owner: "builtin:macro-status", base: true,
                 cheatVar: "CE_skillCheat",
                 multiplierVar: "CE_skillMultiplier",
 
@@ -299,6 +240,10 @@
         });
     }
 
-    $(document).on(":passagedisplay", registerMacroHooks);
+    setup.CE_features.register('macro-status', () => {
+        registerMacroHooks();
+        return () => CE_MacroHook.unregisterOwner('builtin:macro-status');
+    });
+    $(document).one(":passagedisplay", () => setup.CE_features.enable('macro-status'));
 
 })();

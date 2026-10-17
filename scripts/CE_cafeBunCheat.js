@@ -1437,12 +1437,12 @@
     // Save compatibility
     // ============================================================
 
-    $(document).on(
-        ":passageinit",
-        function () {
-            setup.CE_initCafeBunCheat();
-        }
-    );
+    setup.CE_features.register('cafe-settings', () => {
+        const init = () => setup.CE_initCafeBunCheat();
+        $(document).on(':passageinit', init);
+        return () => $(document).off(':passageinit', init);
+    });
+    setup.CE_features.enable('cafe-settings');
 
     // console.log(`${TAG} loaded`);
 })();

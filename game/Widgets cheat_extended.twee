@@ -407,9 +407,9 @@
             <</if>>
         <</button>>
 
-        <<button "卸載 cheatExtended">>
+        <<button "重置 cheatExtended 設定">>
             <<script>>
-                if (confirm("確認要卸載 cheatExtended 並清除相關變數嗎？")) {
+                if (confirm("確認要清除 CE 設定與自訂 Hook 嗎？Mod 本身會保留。")) {
                     window.clearCEVars();
                     alert("已清除 CE 相關變數！");
                 }

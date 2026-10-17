@@ -31,12 +31,12 @@ const CE_TransformationDailyGain = (() => {
     // =========================
     // 註冊每日事件
     // =========================
-    config.forEach(cfg => {
+    registerCE_timeFeature('transformation-daily', config.map(cfg => {
         const enabledVar = `CE_${cfg.key}BuildDailyGainEnabled`;
         const amountVar  = `CE_${cfg.key}BuildDailyGainAmount`;
         
         // registerCE_genericTimeEvent已在CE_Time_Event.js定義 
-        registerCE_genericTimeEvent(
+        return [
             "onDay",
             `CE_${cfg.label}轉化點數每日增加`,
             () => {
@@ -54,8 +54,8 @@ const CE_TransformationDailyGain = (() => {
                     V[cfg.buildVar] + Math.max(0, V[amountVar])
                 );
             }
-        );
-    });
+        ];
+    }));
 
     // =========================
     // UI Macro

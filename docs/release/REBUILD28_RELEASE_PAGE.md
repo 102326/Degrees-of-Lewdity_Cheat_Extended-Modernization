@@ -68,7 +68,7 @@ Windows 已完成固定上游源码生成样本的对应升级检查。两种输
 
 ## 源码、署名与反馈
 
-本版源码固定在标签 [`v1.20.3.1-rebuild.28`](https://github.com/102326/Degrees-of-Lewdity_Cheat_Extended-Modernization/tree/v1.20.3.1-rebuild.28)，分支为 `release/rebuild.28-limited-test`。`main` 尚未合并重制运行代码，复现本版请使用标签。运行资源与冻结 ZIP 的对应关系见[源码身份说明](https://github.com/102326/Degrees-of-Lewdity_Cheat_Extended-Modernization/blob/v1.20.3.1-rebuild.28/docs/release/REBUILD28_SOURCE_IDENTITY.md)。
+默认克隆的 `main` 已通过保留历史的合并纳入当前正式版运行源码。精确复现已发布包仍使用固定标签 [`v1.20.3.1-rebuild.28`](https://github.com/102326/Degrees-of-Lewdity_Cheat_Extended-Modernization/tree/v1.20.3.1-rebuild.28)。主分支保留新版 README，它属于打包资源，本地重打包摘要可能不同；发布 ZIP 和标签保持不变。随附说明及固定标签文档中的“main 尚未合并”为发布时状态，当前入口见[源码与构建说明](https://github.com/102326/Degrees-of-Lewdity_Cheat_Extended-Modernization/blob/main/docs/release/REBUILD28_SOURCE_IDENTITY.md)。
 
 原 Mod 作者为 [chris81605](https://github.com/chris81605)，重制维护为 [102326](https://github.com/102326)，保留隨風飄逸及其它原贡献者署名。本项目为独立衍生维护，不代表原作者正式发行或背书。沿用 CC BY-NC-SA 4.0，包内 Spectrum（MIT）、OpenCC（Apache 2.0）等第三方代码保留各自许可与通知。
 

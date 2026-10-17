@@ -56,7 +56,7 @@ Windows 结果覆盖 Chrome 浏览器宿主，未验收 Windows 封装 App 或 C
 
 ## 源码与反馈
 
-复现本版请使用标签 [`v1.20.3.1-rebuild.28`](https://github.com/102326/Degrees-of-Lewdity_Cheat_Extended-Modernization/tree/v1.20.3.1-rebuild.28)，对应分支为 `release/rebuild.28-limited-test`。**`main` 尚未合并这次重制的运行代码**，请勿把默认分支打包结果当成本版发布包。运行资源与冻结 ZIP 的对应关系见[源码身份说明](https://github.com/102326/Degrees-of-Lewdity_Cheat_Extended-Modernization/blob/v1.20.3.1-rebuild.28/docs/release/REBUILD28_SOURCE_IDENTITY.md)。
+默认克隆的 `main` 已包含当前正式版运行源码，保留原有历史与新版首页。精确复现已发布包请使用固定标签 [`v1.20.3.1-rebuild.28`](https://github.com/102326/Degrees-of-Lewdity_Cheat_Extended-Modernization/tree/v1.20.3.1-rebuild.28)。`main` 的 README 会继续维护，且它本身属于打包资源，因此本地重打包的 ZIP 摘要可能与冻结发布包不同。构建方法及源码对应关系见[源码与构建说明](docs/release/REBUILD28_SOURCE_IDENTITY.md)。
 
 报告问题时，请提供 CE、游戏与框架版本、触发步骤、预期结果和实际结果，可选附脱敏截图或日志。可使用[反馈模板](https://github.com/102326/Degrees-of-Lewdity_Cheat_Extended-Modernization/releases/download/v1.20.3.1-rebuild.28/FEEDBACK-TEMPLATE.md)，无需默认提供完整存档。
 

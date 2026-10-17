@@ -92,64 +92,17 @@ function sortColorsByLuminance(skin){
 // 更新模型顯示
 // -------------------------
 function refreshSkinSidebar(useFullRedraw = false, delay = 50) {
-    setTimeout(() => {
-        if (useFullRedraw) {
-            Renderer.lastAnimation.stop();
-            Renderer.animateLayersAgain();
-        } else {
-            Renderer.lastAnimation.invalidateCaches();
-            Renderer.lastAnimation.redraw();
-        }
-        //Renderer.CanvasModelCaches = {};
-        Wikifier.wikifyEval('<<updatesidebarimg true>>');
-    }, delay);
+    setup.CE_appearanceRendering.refresh(useFullRedraw, delay);
 }
 
 // -------------------------
 // 推送自訂膚色到 setup
 // -------------------------
 function pushCustomSkinsToSetup(){
-	if(!Array.isArray(V.customSkin)) return;
-
-	V.customSkin.forEach(skin => {
-        sortColorsByLuminance(skin);
-		setup.colours.skin_options[skin.name] = {
-			gradient: skin.colors,
-			blendMode: "multiply",
-			desaturate: !!skin.desaturate,
-			alpha: skin.alpha ?? 1
-		};
-	});
+    const skins = Array.isArray(V.customSkin) ? V.customSkin : [];
+    skins.forEach(sortColorsByLuminance);
+    setup.CE_customColours.project('skin_options', skins);
 }
-
-// -------------------------
-// 讀檔後膚色資料檢查(設定觸發旗標)
-// -------------------------
-function checkCSC() {    
-    console.log(`[cheat extended][SkinCustom] 🧾 正在執行讀檔後膚色資料檢查……`);
-    setup.skinCustomInit = true; 
-} 
-     
-Save.onLoad.add(checkCSC);
-
-$(document).one(':passageinit', () => {
-    if(!V.customSkin || !V.customSkin.length) return;
-
-    if(Array.isArray(V.customSkin)) {
-        console.log(`[cheat extended][SkinCustom] 🧾 正在執行膚色資料檢查……`);
-        setup.skinCustomInit = true;             
-    }
-});
-
-$(document).on(':passagedisplay', () => {
-	if(!setup.skinCustomInit) return;
-
-	if(Array.isArray(V.customSkin)){
-		console.log('[cheat extended][SkinCustom] 🔹 初始化自訂膚色...');
-		pushCustomSkinsToSetup();
-		delete setup.skinCustomInit;
-	}
-});
 
 /* =========================
    Skin Color Presets
@@ -376,9 +329,6 @@ Macro.add('skinCustomManager', {
                 nameInput.value = skin.name;
                 nameInput.style.width='140px';
                 nameInput.onchange = function(){
-                    for(const key in setup.colours.skin_options){
-                        if(key===skin.name) delete setup.colours.skin_options[key];
-                    }
                     skin.name = this.value.trim() || `自訂膚色${idx+1}`;
                     pushCustomSkinsToSetup();
                     V.player.skin.color = skin.name;
@@ -550,7 +500,7 @@ Macro.add('skinCustomManager', {
                 delBtn.textContent='刪除';
                 delBtn.onclick = function(){
                     V.customSkin.splice(idx,1);
-                    delete setup.colours.skin_options[skin.name];
+                    pushCustomSkinsToSetup();
                     render();
                 };
                 opRow.appendChild(delBtn);

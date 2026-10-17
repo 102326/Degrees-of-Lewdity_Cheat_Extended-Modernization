@@ -5,7 +5,7 @@
  * 功能：
  * - 依服裝部位與名稱管理特質設定。
  * - 將自訂特質記錄於遊戲存檔。
- * - 讀檔時還原服裝定義並套用目前存檔的設定。
+ * - 讀檔時撤銷仍歸 CE 所有的定義修改，再套用目前存檔的設定。
  * - 手動修改時同步更新目前穿著的同件服裝。
  *
  * 不直接介入遊戲換裝或服裝堆疊(Dol原版優化功能)流程。
@@ -19,6 +19,8 @@
     const MACRO = "clothTraitEditor";
     let snapshot = null;
     let initialized = false;
+    let active = false;
+    const definitionEdits = new Map();
     let appliedRecord = null;
     let appliedSignature = null;
 
@@ -37,21 +39,20 @@
     };
 
     function requireReady() {
+        if (!active) throw new Error("服裝特質編輯器已停用");
         if (!initialized || !snapshot) throw new Error("服裝特質編輯器尚未初始化");
         if (!setup.clothes || typeof setup.clothes !== "object") throw new Error("setup.clothes 不可用");
     }
 
-    // 記錄各部位服裝的原始特質，供讀檔及還原使用。
+    // 記錄各定義物件的初始特質，供手動套回初始特質使用。
     function takeSnapshot() {
-        const result = Object.create(null);
+        const result = new WeakMap();
         for (const [part, clothes] of Object.entries(setup.clothes || {})) {
             if (!Array.isArray(clothes)) continue;
-            const originals = Object.create(null);
             for (const item of clothes) {
                 if (!item || typeof item.name !== "string" || !item.name) continue;
-                originals[item.name] = normalize(item.type);
+                result.set(item, normalize(item.type));
             }
-            result[part] = originals;
         }
         return result;
     }
@@ -65,9 +66,9 @@
 
     function getEntry(part, name) {
         const found = findByName(part, name);
-        const originals = snapshot?.[part];
-        if (!found || !originals || !Object.hasOwn(originals, name)) return null;
-        return { ...found, original: originals[name] };
+        if (!found || !snapshot) return null;
+        if (!snapshot.has(found.item)) snapshot.set(found.item, normalize(found.item.type));
+        return { ...found, original: snapshot.get(found.item) };
     }
 
     function readDb() {
@@ -112,16 +113,33 @@
     // 核心：服裝定義還原、自訂設定套用與穿著同步
     // ============================================================
 
+    function ownsDefinition(item, edit) {
+        const descriptor = Object.getOwnPropertyDescriptor(item, 'type');
+        return descriptor && 'value' in descriptor
+            && Reflect.ownKeys(edit.descriptor).every(key => descriptor[key] === edit.descriptor[key])
+            && descriptor.value === edit.value && edit.value.length === edit.contents.length
+            && edit.contents.every((type, index) => edit.value[index] === type);
+    }
+
+    function writeDefinition(item, types) {
+        const previous = definitionEdits.get(item);
+        const before = previous && ownsDefinition(item, previous) ? previous.before : item.type;
+        const value = normalize(types);
+        item.type = value;
+        definitionEdits.set(item, { before, value, contents: value.slice(),
+            descriptor: Object.getOwnPropertyDescriptor(item, 'type') });
+    }
+
     function resetDefinitions() {
-        for (const [part, originals] of Object.entries(snapshot || {})) {
-            const clothes = setup.clothes?.[part];
-            if (!Array.isArray(clothes)) continue;
-            for (const item of clothes) {
-                if (item && Object.hasOwn(originals, item.name)) {
-                    item.type = originals[item.name].slice();
-                }
-            }
+        let failure;
+        for (const [item, edit] of definitionEdits) {
+            try {
+                // Foreign replacements and in-place edits no longer belong exclusively to CE.
+                if (ownsDefinition(item, edit)) item.type = edit.before;
+                definitionEdits.delete(item);
+            } catch (error) { failure ??= error; }
         }
+        if (failure) throw failure;
     }
 
     function applyDatabase(db) {
@@ -134,7 +152,7 @@
                     console.warn(TAG, "找不到服裝，略過覆寫", part, name);
                     continue;
                 }
-                entry.item.type = normalize(rec.types);
+                writeDefinition(entry.item, rec.types);
             }
         }
     }
@@ -147,9 +165,9 @@
         if (worn && worn.name === name) worn.type = normalize(types);
     }
 
-    // 存檔設定改變時，先恢復原始定義，再套用自訂設定。
+    // 配置未變時不自動偵測定義物件替換；強制 refresh 可重新綁定。
     function reconcile(force = false) {
-        if (!initialized || typeof V === "undefined" || !V) return;
+        if (!active || !initialized || typeof V === "undefined" || !V) return;
         const db = readDb();
         const next = signature(db);
         if (!force && appliedRecord === db && appliedSignature === next) return;
@@ -171,11 +189,11 @@
                 delete db[part][name];
                 if (!Object.keys(db[part]).length) delete db[part];
             }
-            entry.item.type = entry.original.slice();
+            writeDefinition(entry.item, entry.original);
         } else {
             db[part] ??= {};
             db[part][name] = { name, types: next.slice() };
-            entry.item.type = next.slice();
+            writeDefinition(entry.item, next);
         }
         appliedRecord = db;
         appliedSignature = signature(db);
@@ -250,12 +268,10 @@
     function initialize() {
         if (initialized) return;
         if (!setup.clothes || typeof setup.clothes !== "object") {
-            console.error(TAG, "setup.clothes 尚未就緒，無法建立初始化快照");
-            return;
+            throw new Error("setup.clothes 尚未就緒，無法建立初始化快照");
         }
         snapshot = takeSnapshot();
         initialized = true;
-        reconcile(true);
         console.info(TAG, "初始化快照完成");
     }
 
@@ -353,6 +369,8 @@
         const body = element("div", "dol-body");
         body.style.cssText = "min-width:0;max-width:100%;box-sizing:border-box";
         body.append(element("div", "dol-desc", "自由調整每件服裝的特質，換下或重新穿上後，修改仍會保留。"));
+        body.append(element("div", "dol-desc", "其他 Mod 動態替換服裝資料後，覆寫可能要到重新讀檔或重新啟用才會再套用。"));
+        body.append(element("div", "dol-desc", "單件「套回初始特質」會立即修改定義與目前穿著的同件服裝；之後重新校正或停用時，定義仍可能回到 CE 介入前的第三方版本。「撤銷全部覆寫」則交還定義並同步相關穿著，兩者結果可能不同。"));
 
         // 提供舊版穿著特質管理入口。
         const legacyEntry = element("div", "dol-desc");
@@ -497,13 +515,13 @@
                             renderUI(host, state);
                         } catch (error) { message(error.message, true); }
                     }));
-                    editor.append(button("還原", () => {
+                    editor.append(button("套回初始特質", () => {
                         try {
                             const before = garment.types.slice();
                             const after = restore(garment.part, garment.name);
                             const changes = traitDiff(before, after);
                             state.status = {
-                                title: `還原結果：${garment.label}`,
+                                title: `套回初始特質結果：${garment.label}`,
                                 lines: changes.added.length || changes.removed.length
                                     ? [{ added: changes.added, removed: changes.removed }] : []
                             };
@@ -519,8 +537,8 @@
         }
 
         const footer = element("div", "dol-section-block");
-        footer.append(button("還原全部已修改服裝", () => {
-            if (!window.confirm("確定還原目前存檔中全部服裝特質修改？")) return;
+        footer.append(button("撤銷全部覆寫", () => {
+            if (!window.confirm("確定刪除目前存檔的全部服裝特質覆寫，交還服裝定義並同步相關穿著？第三方後續修改會保留。")) return;
             try {
                 const before = [];
                 for (const [part, group] of Object.entries(readDb())) {
@@ -546,7 +564,7 @@
                         lines.push({ label: item.label, ...changes });
                     }
                 }
-                state.status = { title: "全部還原結果", lines };
+                state.status = { title: "撤銷全部覆寫結果", lines };
                 renderUI(host, state);
             }
             catch (error) { message(error.message, true); }
@@ -574,8 +592,24 @@
         refresh: () => reconcile(true)
     });
 
-    $(document).one(":passageinit", initialize);
-    $(document).on(":passageinit", () => {
-        if (initialized) reconcile();
+    setup.CE_features.register('clothing-traits', () => {
+        initialize();
+        active = true;
+        try { reconcile(true); }
+        catch (error) { active = false; resetDefinitions(); throw error; }
+        const onPassage = () => reconcile();
+        $(document).on(':passageinit', onPassage);
+        return () => {
+            active = false;
+            try { $(document).off(':passageinit', onPassage); }
+            finally {
+                appliedRecord = appliedSignature = null;
+                resetDefinitions();
+            }
+        };
+    });
+    $(document).one(':passageinit', () => {
+        try { setup.CE_features.enable('clothing-traits'); }
+        catch (error) { console.error(TAG, '模組啟用失敗', error); }
     });
 })();

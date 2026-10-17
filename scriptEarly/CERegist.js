@@ -1,73 +1,18 @@
+/* Core uses SugarCube directly; Maple supplies the existing UI injection points. */
 (() => {
-    window.modSC2DataManager.getModLoadController().addLifeTimeCircleHook(
-        'cheatExtended',
-        {
-            ModLoaderLoadEnd: async () => {
-                function parseVersion(versionString) {
-                    return versionString.split('.').map(Number);
-                }
-                function compareVersions(vLoaded, vRequired) {
-                    const vl = parseVersion(vLoaded);
-                    const vr = parseVersion(vRequired);
-                    const vLength = Math.max(vl.length, vr.length);
-                    for (let i = 0; i < vLength; i++) {
-                        const num1 = vl[i] || 0;
-                        const num2 = vr[i] || 0;
-                        if (num1 > num2) return 1;
-                        if (num1 < num2) return 0;
-                    }
-                    return 1;
-                }
-
-                const logger = window.modUtils.getLogger();
-
-                // Maplebirch 框架檢測
-                const maplebirchMod = window.modUtils.getMod('maplebirch');
-                if (maplebirchMod) {
-                    if (compareVersions(maplebirchMod.version, "3.2.5") === 1) {
-                        logger.log(`[Cheat Extended] 检测到 maplebirch 框架 v${maplebirchMod.version}`);
-                        
-                        maplebirch.modList.pushUnique("cheat extended");
-                        // Maplebirch 註冊對應 Cheat Extended
-                        maplebirch.tool.addTo('Cheats', 'cheat_extended');                        
-                       // maplebirch.tool.addTo('MenuBig', 'CE_buttom');
-                       //maplebirch.tool.addTo('MenuSmall', 'CE_originalCheatButton');
-                       maplebirch.tool.addTo('MenuBig', 'CE_originalCheatButton');                      
-                        maplebirch.tool.addTo('CaptionAfterDescription', 'CEstatebox');
-                        maplebirch.tool.addTo('Options', 'CE_options');
-                        maplebirch.tool.addTo('HintMobile', 'CE_sideBarIcon');
-                        maplebirch.tool.addTo('Footer', 'CE_CheatExtendedVersion');                        
-                        
-                    } else {
-                        logger.error(`[Cheat Extended] maplebirch 版本過低，至少需要 v3.2.5，當前 v${maplebirchMod.version}`);
-                    }
-                    return;
-                }
-
-                // Simple Frameworks 框架檢測
-                const simpleMod = window.modUtils.getMod('Simple Frameworks');
-                if (simpleMod) {
-                    if (compareVersions(simpleMod.version, "2.0.5") === 1) {
-                        logger.log(`[Cheat Extended] 检测到 Simple Frameworks 框架 v${simpleMod.version}`);
-
-                        // Simple Frameworks 註冊 Cheat Extended
-                        simpleFrameworks.addto('iModCheats', 'cheat_extended');                     
-                        simpleFrameworks.addto('ModMenuBig', 'CE_originalCheatButton');
-                      //  simpleFrameworks.addto('ModMenuBig', 'CE_buttom');                      
-                        simpleFrameworks.addto('ModCaptionAfterDescription', 'CEstatebox');
-                        simpleFrameworks.addto('iModOptions', 'CE_options');
-                        simpleFrameworks.addto('iModFooter', 'CE_CheatExtendedVersion');
-                       // V.CE_SFflag = true;
-
-                    } else {
-                        logger.error(`[Cheat Extended] Simple Frameworks 版本過低，至少需要 v2.0.5，當前 v${simpleMod.version}`);
-                    }
-                    return;
-                }
-
-                // 都沒檢測到
-                logger.error(`[Cheat Extended] 未检测到 maplebirch 或 Simple Frameworks 框架，请加载前置模组`);
-            },
+    window.modSC2DataManager.getModLoadController().addLifeTimeCircleHook('cheatExtended', {
+        ModLoaderLoadEnd: async () => {
+            const maple = window.maplebirch;
+            if (typeof maple?.tool?.addTo !== 'function') {
+                window.modUtils.getLogger().error('[Cheat Extended] MapleBirch tool.addTo unavailable; CE UI cannot register');
+                return;
+            }
+            maple.modList.pushUnique('cheat extended');
+            for (const [zone, widget] of [
+                ['Cheats', 'cheat_extended'], ['MenuBig', 'CE_originalCheatButton'],
+                ['CaptionAfterDescription', 'CEstatebox'], ['Options', 'CE_options'],
+                ['HintMobile', 'CE_sideBarIcon'], ['Footer', 'CE_CheatExtendedVersion'],
+            ]) maple.tool.addTo(zone, widget);
         }
-    );
+    });
 })();

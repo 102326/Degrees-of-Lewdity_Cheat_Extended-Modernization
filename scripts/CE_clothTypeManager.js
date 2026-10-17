@@ -28,6 +28,10 @@ Object.defineProperty(setup, "clothTypeNameMap", {
 /* === DOL 風格：服裝 Type 管理器 === */
 Macro.add('clothTypeManager', {
     handler() {
+        if (!setup.CE_features.isEnabled('worn-trait-presets')) {
+            this.output.append('自動預設已停用，此時不開啟新面板；已開啟的手動面板仍可操作。');
+            return;
+        }
         if (!V.worn || !setup.clothes) {
             this.output.append('服裝資料不完整');
             return;
@@ -92,6 +96,7 @@ Macro.add('clothTypeManager', {
         body.innerHTML += `
             <div class="dol-desc">
                 暫時調整目前穿著的特質，也可以儲存和套用預設。換裝後是否自動套用，可在下方設定。
+                自動預設模組停用只停止自動套用，已開啟面板的手動操作仍可使用。
             </div><br>
         `;
 
@@ -374,7 +379,7 @@ Macro.add('clothTypeManager', {
         body.appendChild(document.createElement('br'));
         body.appendChild(Object.assign(document.createElement('span'), {
             className: 'note',
-            textContent: '💡 套用添加或去掉指定類型；還原會回到原始服裝定義'
+            textContent: '💡 套用添加或去掉指定類型；還原會依目前服裝定義修改穿著實例'
         }));
 
         root.appendChild(body);
@@ -384,6 +389,7 @@ Macro.add('clothTypeManager', {
 
 
 setup.autoApplyClothTypePreset = function () {
+    if (!setup.CE_features.isEnabled('worn-trait-presets')) return;
     if (!V.clothTypeAutoApply) return;
     if (!V.clothTypeLastPreset) return;
 
@@ -408,9 +414,13 @@ setup.autoApplyClothTypePreset = function () {
     );
 };
 
-$(document).on(':passagedisplay', () => {
-    setup.autoApplyClothTypePreset();
+setup.CE_features.register('worn-trait-presets', () => {
+    let active = true;
+    const apply = () => { if (active) setup.autoApplyClothTypePreset(); };
+    $(document).on(':passagedisplay', apply);
+    return () => { active = false; $(document).off(':passagedisplay', apply); };
 });
+setup.CE_features.enable('worn-trait-presets');
 
 
 

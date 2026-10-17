@@ -421,7 +421,7 @@
 			}
 		};
 
-		if (window.modSweetAlert2Mod?.fire) {
+		if (typeof window.modSweetAlert2Mod?.fire === 'function') {
 			window.modSweetAlert2Mod.fire(options);
 			return;
 		}
@@ -602,7 +602,7 @@
 			}
 		};
 
-		if (window.modSweetAlert2Mod?.fire) {
+		if (typeof window.modSweetAlert2Mod?.fire === 'function') {
 			window.modSweetAlert2Mod.fire(options);
 			return;
 		}
